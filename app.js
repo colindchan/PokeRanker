@@ -1,4 +1,4 @@
-const GLOBAL_STORAGE_KEY = "pokemon-ranker-global-v5";
+const GLOBAL_STORAGE_KEY = "pokemon-ranker-global-v6";
 const THEME_KEY = "pokemon-ranker-theme";
 
 // Optional: Set your hosted backend API URL here if hosted separately (e.g. "https://your-api.render.com")
@@ -7,6 +7,7 @@ const API_BASE_URL = window.location.origin;
 const state = {
   pokemon: [],
   globalResults: {},
+  headToHead: {},
   globalMatchups: 0,
   current: [],
   searchQuery: "",
@@ -26,6 +27,21 @@ function showToast(message) {
   setTimeout(() => { toast.hidden = true; }, 3000);
 }
 
+// Calculate NBA 2K Style OVR rating (Scale 60 to 99)
+function calculateOvr(elo) {
+  const r = elo !== undefined ? elo : 1500;
+  // 1500 Elo -> 75 OVR; +20 Elo = +1 OVR
+  const ovr = Math.round(75 + (r - 1500) / 20);
+  return Math.min(99, Math.max(60, ovr));
+}
+
+function getOvrClass(ovr) {
+  if (ovr >= 90) return "tier-90";
+  if (ovr >= 80) return "tier-80";
+  if (ovr >= 70) return "tier-70";
+  return "tier-60";
+}
+
 // Primary image path builder (Root level part_01/0001_bulbasaur.png)
 function getPrimaryImageUrl(pokemon) {
   const numStr = String(pokemon.number).padStart(4, "0");
@@ -39,26 +55,22 @@ function getFallbackImageUrl(pokemon) {
   return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${pokemon.number}.png`;
 }
 
-// Multi-path smart fallback loader (Handles root part_XX/, pokemon_images/part_XX/, and Official CDN)
+// Multi-path smart fallback loader
 function setImgSrcWithFallback(imgEl, pokemon) {
   const numStr = String(pokemon.number).padStart(4, "0");
   const partNum = String(Math.floor((pokemon.number - 1) / 50) + 1).padStart(2, "0");
   const fn = pokemon.fileName || pokemon.name.toLowerCase().replace(/[^a-z0-9]+/g, "_");
 
-  // Attempt 1: Root level part_01/0001_bulbasaur.png (When dragged directly onto GitHub root)
   imgEl.src = `part_${partNum}/${numStr}_${fn}.png`;
   imgEl.alt = pokemon.name;
 
   imgEl.onerror = () => {
-    // Attempt 2: Inside pokemon_images folder (pokemon_images/part_01/0001_bulbasaur.png)
     imgEl.src = `pokemon_images/part_${partNum}/${numStr}_${fn}.png`;
 
     imgEl.onerror = () => {
-      // Attempt 3: Official Pokemon CDN artwork
       imgEl.src = getFallbackImageUrl(pokemon);
 
       imgEl.onerror = () => {
-        // Attempt 4: PokeAPI sprite
         imgEl.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokemon.number}.png`;
       };
     };
@@ -80,7 +92,7 @@ function parseCsvLine(line) {
   return values;
 }
 
-// Sync global data with server API (Includes Auto-Restore Protection)
+// Sync global data with server API
 async function syncGlobalApiData() {
   try {
     const res = await fetch(`${API_BASE_URL}/api/stats`);
@@ -94,20 +106,26 @@ async function syncGlobalApiData() {
         if (data.stats) {
           state.globalResults = data.stats;
         }
+        if (data.headToHead) {
+          state.headToHead = data.headToHead;
+        }
         saveGlobalState();
       } else if (state.globalMatchups > 0) {
         // Auto-restore server data if server restarted/reset
         await fetch(`${API_BASE_URL}/api/sync`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ totalMatchups: state.globalMatchups, stats: state.globalResults }),
+          body: JSON.stringify({
+            totalMatchups: state.globalMatchups,
+            stats: state.globalResults,
+            headToHead: state.headToHead,
+          }),
         });
       }
       renderMatchup();
       renderRankings();
     }
   } catch (e) {
-    // API backend not running on current host; fallback to local storage mode
     state.hasApiBackend = false;
   }
 }
@@ -155,6 +173,7 @@ async function loadPokemonData() {
   const savedGlobal = JSON.parse(localStorage.getItem(GLOBAL_STORAGE_KEY) || "null");
   if (savedGlobal) {
     state.globalResults = savedGlobal.results || {};
+    state.headToHead = savedGlobal.headToHead || {};
     state.globalMatchups = savedGlobal.matchups || 0;
   }
 
@@ -168,12 +187,36 @@ async function loadPokemonData() {
 function saveGlobalState() {
   localStorage.setItem(
     GLOBAL_STORAGE_KEY,
-    JSON.stringify({ results: state.globalResults, matchups: state.globalMatchups })
+    JSON.stringify({
+      results: state.globalResults,
+      headToHead: state.headToHead,
+      matchups: state.globalMatchups,
+    })
   );
 }
 
 function getGlobalStats(number) {
-  return state.globalResults[number] || { wins: 0, losses: 0 };
+  const data = state.globalResults[number] || { wins: 0, losses: 0, elo: 1500 };
+  if (data.elo === undefined) data.elo = 1500;
+  return data;
+}
+
+// Local Elo update (opponent-strength weighted)
+function updateLocalElo(winnerNum, loserNum) {
+  const winnerStats = getGlobalStats(winnerNum);
+  const loserStats = getGlobalStats(loserNum);
+
+  const rW = winnerStats.elo;
+  const rL = loserStats.elo;
+
+  const expectedW = 1 / (1 + Math.pow(10, (rL - rW) / 400));
+  const K = 32;
+
+  winnerStats.elo = Math.round(rW + K * (1 - expectedW));
+  loserStats.elo = Math.round(rL - K * (1 - expectedW));
+
+  state.globalResults[winnerNum] = winnerStats;
+  state.globalResults[loserNum] = loserStats;
 }
 
 function randomPair() {
@@ -197,6 +240,14 @@ function fillCard(id, pokemon) {
   card.querySelector("h3").textContent = pokemon.name;
 
   const stats = getGlobalStats(pokemon.number);
+  const ovr = calculateOvr(stats.elo);
+
+  const badgeEl = card.querySelector(".ovr-badge");
+  if (badgeEl) {
+    badgeEl.textContent = `${ovr} OVR`;
+    badgeEl.className = `ovr-badge ${getOvrClass(ovr)}`;
+  }
+
   const total = stats.wins + stats.losses;
   const winRate = total ? Math.round((stats.wins / total) * 100) : 0;
 
@@ -234,16 +285,20 @@ function choose(winner) {
   // Local state update
   const winnerStats = getGlobalStats(winner.number);
   winnerStats.wins += 1;
-  state.globalResults[winner.number] = winnerStats;
-
   const loserStats = getGlobalStats(loser.number);
   loserStats.losses += 1;
-  state.globalResults[loser.number] = loserStats;
+
+  // Head to Head tracking
+  const h2hKey = `${winner.number}_vs_${loser.number}`;
+  state.headToHead[h2hKey] = (state.headToHead[h2hKey] || 0) + 1;
+
+  // Elo rating update based on opponent strength
+  updateLocalElo(winner.number, loser.number);
 
   state.globalMatchups += 1;
   saveGlobalState();
 
-  // Send vote to backend API (if connected)
+  // Send vote to backend API
   sendVoteToApi(winner.number, loser.number);
 
   renderMatchup();
@@ -253,9 +308,11 @@ function choose(winner) {
 function getSortedPokemon() {
   return [...state.pokemon].sort((a, b) => {
     const sa = getGlobalStats(a.number), sb = getGlobalStats(b.number);
+    const ovrA = calculateOvr(sa.elo), ovrB = calculateOvr(sb.elo);
     const totalA = sa.wins + sa.losses, totalB = sb.wins + sb.losses;
     const rateA = totalA ? sa.wins / totalA : 0, rateB = totalB ? sb.wins / totalB : 0;
-    return rateB - rateA || sb.wins - sa.wins || a.number - b.number;
+
+    return ovrB - ovrA || rateB - rateA || sb.wins - sa.wins || a.number - b.number;
   });
 }
 
@@ -283,13 +340,15 @@ function renderRankings() {
   if (!tbody) return;
 
   if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 30px;">No Pokémon found matching your query.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 30px;">No Pokémon found matching your query.</td></tr>`;
     return;
   }
 
   tbody.innerHTML = filtered
     .map((pokemon, index) => {
       const stats = getGlobalStats(pokemon.number);
+      const ovr = calculateOvr(stats.elo);
+      const ovrClass = getOvrClass(ovr);
       const total = stats.wins + stats.losses;
       const rate = total ? `${Math.round((stats.wins / total) * 100)}%` : "—";
       const primaryUrl = getPrimaryImageUrl(pokemon);
@@ -298,6 +357,7 @@ function renderRankings() {
       return `
       <tr>
         <td>#${index + 1}</td>
+        <td><span class="ovr-badge ${ovrClass}">${ovr}</span></td>
         <td>
           <div class="rank-name">
             <img src="${primaryUrl}" alt="${pokemon.name}" loading="lazy" onerror="this.onerror=null; this.src='${fallbackUrl}'">
@@ -322,9 +382,10 @@ function shareTopTen() {
 
   top10.forEach((p, idx) => {
     const stats = getGlobalStats(p.number);
+    const ovr = calculateOvr(stats.elo);
     const total = stats.wins + stats.losses;
     const rate = total ? `${Math.round((stats.wins / total) * 100)}% win rate` : "unvoted";
-    text += `${idx + 1}. ${p.name} (#${String(p.number).padStart(4, "0")}) — ${rate}\n`;
+    text += `${idx + 1}. ${p.name} (${ovr} OVR) — ${rate}\n`;
   });
 
   text += "\nVote on Pokémon matchups in PokéRanker!";

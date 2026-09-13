@@ -68,11 +68,14 @@
 
         <div id="matchup-board" class="matchup-board" hidden>
           <article class="pokemon-card" id="card-a" tabindex="0">
+            <div class="card-header-bar">
+              <span class="dex-number"></span>
+              <span class="ovr-badge">75 OVR</span>
+            </div>
             <div class="pokemon-art-wrap">
               <img alt="Pokémon Left" loading="eager" />
             </div>
             <div class="pokemon-card-info">
-              <span class="dex-number"></span>
               <h3></h3>
             </div>
             <div class="card-stats-pill">
@@ -89,11 +92,14 @@
           </div>
 
           <article class="pokemon-card" id="card-b" tabindex="0">
+            <div class="card-header-bar">
+              <span class="dex-number"></span>
+              <span class="ovr-badge">75 OVR</span>
+            </div>
             <div class="pokemon-art-wrap">
               <img alt="Pokémon Right" loading="eager" />
             </div>
             <div class="pokemon-card-info">
-              <span class="dex-number"></span>
               <h3></h3>
             </div>
             <div class="card-stats-pill">
@@ -151,10 +157,11 @@
           <table>
             <thead>
               <tr>
-                <th scope="col" style="width: 70px;">Rank</th>
+                <th scope="col" style="width: 60px;">Rank</th>
+                <th scope="col" style="width: 80px;">OVR</th>
                 <th scope="col">Pokémon</th>
                 <th scope="col" style="width: 130px;">Global Record</th>
-                <th scope="col" style="width: 110px;">Win Rate</th>
+                <th scope="col" style="width: 100px;">Win Rate</th>
               </tr>
             </thead>
             <tbody id="ranking-rows"></tbody>

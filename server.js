@@ -8,12 +8,17 @@ const DATA_FILE = path.join(__dirname, "global_stats.json");
 // Load or initialize global data
 let globalData = {
   totalMatchups: 0,
-  stats: {} // pokemon_number -> { wins, losses }
+  stats: {}, // pokemon_number -> { wins, losses, elo }
+  headToHead: {} // "winner_vs_loser" -> count
 };
 
 if (fs.existsSync(DATA_FILE)) {
   try {
-    globalData = JSON.parse(fs.readFileSync(DATA_FILE, "utf8"));
+    const raw = fs.readFileSync(DATA_FILE, "utf8");
+    const parsed = JSON.parse(raw);
+    globalData.totalMatchups = parsed.totalMatchups || 0;
+    globalData.stats = parsed.stats || {};
+    globalData.headToHead = parsed.headToHead || {};
   } catch (e) {
     console.error("Error reading global_stats.json, starting fresh.");
   }
@@ -21,6 +26,33 @@ if (fs.existsSync(DATA_FILE)) {
 
 function saveData() {
   fs.writeFileSync(DATA_FILE, JSON.stringify(globalData, null, 2), "utf8");
+}
+
+// Calculate Elo update
+function getElo(num) {
+  if (!globalData.stats[num]) {
+    globalData.stats[num] = { wins: 0, losses: 0, elo: 1500 };
+  }
+  if (globalData.stats[num].elo === undefined) {
+    globalData.stats[num].elo = 1500;
+  }
+  return globalData.stats[num].elo;
+}
+
+function updateElo(winnerNum, loserNum) {
+  const rWinner = getElo(winnerNum);
+  const rLoser = getElo(loserNum);
+
+  // Expected win probability for winner
+  const expectedWinner = 1 / (1 + Math.pow(10, (rLoser - rWinner) / 400));
+  const expectedLoser = 1 - expectedWinner;
+
+  const K = 32;
+  const newWinnerElo = Math.round(rWinner + K * (1 - expectedWinner));
+  const newLoserElo = Math.round(rLoser + K * (0 - expectedLoser));
+
+  globalData.stats[winnerNum].elo = newWinnerElo;
+  globalData.stats[loserNum].elo = newLoserElo;
 }
 
 const server = http.createServer((req, res) => {
@@ -37,7 +69,7 @@ const server = http.createServer((req, res) => {
 
   const url = new URL(req.url, `http://${req.headers.host}`);
 
-  // GET /api/stats -> Return global stats
+  // GET /api/stats -> Return global stats and head-to-head data
   if (req.method === "GET" && url.pathname === "/api/stats") {
     res.writeHead(200, { "Content-Type": "application/json" });
     res.end(JSON.stringify(globalData));
@@ -52,12 +84,19 @@ const server = http.createServer((req, res) => {
       try {
         const { winner, loser } = JSON.parse(body);
         if (winner && loser) {
-          if (!globalData.stats[winner]) globalData.stats[winner] = { wins: 0, losses: 0 };
-          if (!globalData.stats[loser]) globalData.stats[loser] = { wins: 0, losses: 0 };
+          if (!globalData.stats[winner]) globalData.stats[winner] = { wins: 0, losses: 0, elo: 1500 };
+          if (!globalData.stats[loser]) globalData.stats[loser] = { wins: 0, losses: 0, elo: 1500 };
 
           globalData.stats[winner].wins += 1;
           globalData.stats[loser].losses += 1;
           globalData.totalMatchups += 1;
+
+          // Record Head-to-Head
+          const h2hKey = `${winner}_vs_${loser}`;
+          globalData.headToHead[h2hKey] = (globalData.headToHead[h2hKey] || 0) + 1;
+
+          // Update Elo Rating based on opponent strength
+          updateElo(winner, loser);
 
           saveData();
 
@@ -80,20 +119,28 @@ const server = http.createServer((req, res) => {
     req.on("data", (chunk) => { body += chunk; });
     req.on("end", () => {
       try {
-        const { totalMatchups, stats } = JSON.parse(body);
+        const { totalMatchups, stats, headToHead } = JSON.parse(body);
         if (totalMatchups && stats) {
           if (totalMatchups > globalData.totalMatchups) {
             globalData.totalMatchups = totalMatchups;
           }
           for (const num in stats) {
             if (!globalData.stats[num]) {
-              globalData.stats[num] = { wins: 0, losses: 0 };
+              globalData.stats[num] = { wins: 0, losses: 0, elo: 1500 };
             }
             if (stats[num].wins > globalData.stats[num].wins) {
               globalData.stats[num].wins = stats[num].wins;
             }
             if (stats[num].losses > globalData.stats[num].losses) {
               globalData.stats[num].losses = stats[num].losses;
+            }
+            if (stats[num].elo && stats[num].elo > globalData.stats[num].elo) {
+              globalData.stats[num].elo = stats[num].elo;
+            }
+          }
+          if (headToHead) {
+            for (const k in headToHead) {
+              globalData.headToHead[k] = Math.max(globalData.headToHead[k] || 0, headToHead[k]);
             }
           }
           saveData();
@@ -131,5 +178,5 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`🚀 Pokémon Ranker Global Server running on http://localhost:${PORT}`);
+  console.log(`🚀 PokéRanker Global Server running on http://localhost:${PORT}`);
 });

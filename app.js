@@ -318,7 +318,7 @@ function renderRankings() {
 function shareTopTen() {
   const sorted = getSortedPokemon();
   const top10 = sorted.slice(0, 10);
-  let text = "🏆 Pokémon Global Rankings Top 10:\n\n";
+  let text = "🏆 PokéRanker Global Top 10:\n\n";
 
   top10.forEach((p, idx) => {
     const stats = getGlobalStats(p.number);
@@ -327,7 +327,7 @@ function shareTopTen() {
     text += `${idx + 1}. ${p.name} (#${String(p.number).padStart(4, "0")}) — ${rate}\n`;
   });
 
-  text += "\nVote on Pokémon matchups in the Global Community Ranker!";
+  text += "\nVote on Pokémon matchups in PokéRanker!";
 
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(text).then(() => {

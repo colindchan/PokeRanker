@@ -26,12 +26,12 @@ function showToast(message) {
   setTimeout(() => { toast.hidden = true; }, 3000);
 }
 
-// Format image URL with organized subfolders (part_01, part_02, ... part_21)
+// Primary image path builder (Root level part_01/0001_bulbasaur.png)
 function getPrimaryImageUrl(pokemon) {
   const numStr = String(pokemon.number).padStart(4, "0");
   const partNum = String(Math.floor((pokemon.number - 1) / 50) + 1).padStart(2, "0");
   const fn = pokemon.fileName || pokemon.name.toLowerCase().replace(/[^a-z0-9]+/g, "_");
-  return `pokemon_images/part_${partNum}/${numStr}_${fn}.png`;
+  return `part_${partNum}/${numStr}_${fn}.png`;
 }
 
 function getFallbackImageUrl(pokemon) {
@@ -39,14 +39,29 @@ function getFallbackImageUrl(pokemon) {
   return `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${pokemon.number}.png`;
 }
 
+// Multi-path smart fallback loader (Handles root part_XX/, pokemon_images/part_XX/, and Official CDN)
 function setImgSrcWithFallback(imgEl, pokemon) {
-  imgEl.src = getPrimaryImageUrl(pokemon);
+  const numStr = String(pokemon.number).padStart(4, "0");
+  const partNum = String(Math.floor((pokemon.number - 1) / 50) + 1).padStart(2, "0");
+  const fn = pokemon.fileName || pokemon.name.toLowerCase().replace(/[^a-z0-9]+/g, "_");
+
+  // Attempt 1: Root level part_01/0001_bulbasaur.png (When dragged directly onto GitHub root)
+  imgEl.src = `part_${partNum}/${numStr}_${fn}.png`;
   imgEl.alt = pokemon.name;
+
   imgEl.onerror = () => {
+    // Attempt 2: Inside pokemon_images folder (pokemon_images/part_01/0001_bulbasaur.png)
+    imgEl.src = `pokemon_images/part_${partNum}/${numStr}_${fn}.png`;
+
     imgEl.onerror = () => {
-      imgEl.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokemon.number}.png`;
+      // Attempt 3: Official Pokemon CDN artwork
+      imgEl.src = getFallbackImageUrl(pokemon);
+
+      imgEl.onerror = () => {
+        // Attempt 4: PokeAPI sprite
+        imgEl.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokemon.number}.png`;
+      };
     };
-    imgEl.src = getFallbackImageUrl(pokemon);
   };
 }
 

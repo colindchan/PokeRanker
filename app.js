@@ -358,21 +358,6 @@ document.addEventListener("DOMContentLoaded", () => {
     })
   );
 
-  // Reset button
-  const resetBtn = $("#reset-button");
-  if (resetBtn) {
-    resetBtn.onclick = () => {
-      if (confirm("Are you sure you want to reset the global rankings cache?")) {
-        state.globalResults = {};
-        state.globalMatchups = 0;
-        saveGlobalState();
-        renderMatchup();
-        renderRankings();
-        showToast("Global rankings data cache reset.");
-      }
-    };
-  }
-
   // Search & Gen Filters
   const searchInput = $("#search-input");
   if (searchInput) {

@@ -1,7 +1,7 @@
 const GLOBAL_STORAGE_KEY = "pokemon-ranker-global-v6";
 const THEME_KEY = "pokemon-ranker-theme";
 
-// Optional: Set your hosted backend API URL here if hosted separately (e.g. "https://your-api.render.com")
+// Optional: Set your hosted backend API URL here if hosted separately (e.g. "https://pokeranker.onrender.com")
 const API_BASE_URL = window.location.origin;
 
 const state = {
@@ -27,11 +27,30 @@ function showToast(message) {
   setTimeout(() => { toast.hidden = true; }, 3000);
 }
 
+// Dynamically compute Elo rating based on win rate and opponent-weighting
+function getEloFromStats(stats) {
+  if (!stats) return 1500;
+  if (stats.elo !== undefined && stats.elo !== 1500) {
+    return stats.elo;
+  }
+  const wins = stats.wins || 0;
+  const losses = stats.losses || 0;
+  const total = wins + losses;
+  if (!total) return 1500;
+
+  // Win rate ratio with laplace smoothing (+1 win, +1 loss)
+  const winRate = (wins + 1) / (total + 2);
+  // Logarithmic Elo offset: winRate 0.5 -> 0, winRate 0.9 -> +380, winRate 0.1 -> -380
+  const eloOffset = Math.round(400 * Math.log10(winRate / (1 - winRate)));
+  return 1500 + eloOffset;
+}
+
 // Calculate NBA 2K Style OVR rating (Scale 60 to 99)
-function calculateOvr(elo) {
-  const r = elo !== undefined ? elo : 1500;
+function calculateOvr(stats) {
+  if (!stats) return 75;
+  const elo = getEloFromStats(stats);
   // 1500 Elo -> 75 OVR; +20 Elo = +1 OVR
-  const ovr = Math.round(75 + (r - 1500) / 20);
+  const ovr = Math.round(75 + (elo - 1500) / 20);
   return Math.min(99, Math.max(60, ovr));
 }
 
@@ -221,7 +240,6 @@ function saveGlobalState() {
 
 function getGlobalStats(number) {
   const data = state.globalResults[number] || { wins: 0, losses: 0, elo: 1500 };
-  if (data.elo === undefined) data.elo = 1500;
   return data;
 }
 
@@ -230,8 +248,8 @@ function updateLocalElo(winnerNum, loserNum) {
   const winnerStats = getGlobalStats(winnerNum);
   const loserStats = getGlobalStats(loserNum);
 
-  const rW = winnerStats.elo;
-  const rL = loserStats.elo;
+  const rW = getEloFromStats(winnerStats);
+  const rL = getEloFromStats(loserStats);
 
   const expectedW = 1 / (1 + Math.pow(10, (rL - rW) / 400));
   const K = 32;
@@ -264,7 +282,7 @@ function fillCard(id, pokemon) {
   card.querySelector("h3").textContent = pokemon.name;
 
   const stats = getGlobalStats(pokemon.number);
-  const ovr = calculateOvr(stats.elo);
+  const ovr = calculateOvr(stats);
 
   const badgeEl = card.querySelector(".ovr-badge");
   if (badgeEl) {
@@ -332,7 +350,7 @@ function choose(winner) {
 function getSortedPokemon() {
   return [...state.pokemon].sort((a, b) => {
     const sa = getGlobalStats(a.number), sb = getGlobalStats(b.number);
-    const ovrA = calculateOvr(sa.elo), ovrB = calculateOvr(sb.elo);
+    const ovrA = calculateOvr(sa), ovrB = calculateOvr(sb);
     const totalA = sa.wins + sa.losses, totalB = sb.wins + sb.losses;
     const rateA = totalA ? sa.wins / totalA : 0, rateB = totalB ? sb.wins / totalB : 0;
 
@@ -371,7 +389,7 @@ function renderRankings() {
   tbody.innerHTML = filtered
     .map((pokemon, index) => {
       const stats = getGlobalStats(pokemon.number);
-      const ovr = calculateOvr(stats.elo);
+      const ovr = calculateOvr(stats);
       const ovrClass = getOvrClass(ovr);
       const total = stats.wins + stats.losses;
       const rate = total ? `${Math.round((stats.wins / total) * 100)}%` : "—";
@@ -398,7 +416,7 @@ function renderRankings() {
     .join("");
 }
 
-// Social Share feature
+// Social Share feature (Includes website link pokeranker.onrender.com)
 function shareTopTen() {
   const sorted = getSortedPokemon();
   const top10 = sorted.slice(0, 10);
@@ -406,13 +424,13 @@ function shareTopTen() {
 
   top10.forEach((p, idx) => {
     const stats = getGlobalStats(p.number);
-    const ovr = calculateOvr(stats.elo);
+    const ovr = calculateOvr(stats);
     const total = stats.wins + stats.losses;
     const rate = total ? `${Math.round((stats.wins / total) * 100)}% win rate` : "unvoted";
     text += `${idx + 1}. ${p.name} (${ovr} OVR) — ${rate}\n`;
   });
 
-  text += "\nVote on Pokémon matchups in PokéRanker!";
+  text += "\nVote on Pokémon matchups in PokéRanker: https://pokeranker.onrender.com";
 
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(text).then(() => {

@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pokémon Ranker — Global Leaderboard & Matchups</title>
+    <meta name="description" content="Vote on head-to-head Pokémon matchups and view the global community ranking for all 1,025 Pokémon." />
+    
+    <!-- OpenGraph / Social Previews -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Pokémon Ranker — Global Community Leaderboard" />
+    <meta property="og:description" content="Compare and rank all 1,025 Pokémon head-to-head. View real-time global community rankings." />
+    <meta property="og:image" content="pokemon_images/0025_pikachu.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..700;1,9..40,400..700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+    
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="toast" class="toast" aria-live="polite" hidden></div>
+
+    <main class="app-shell">
+      <!-- Header Bar -->
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-badge">Global Community Ranker</span>
+          <h1>Pokémon Ranker</h1>
+        </div>
+
+        <nav class="tabs" aria-label="Main navigation">
+          <button class="tab is-active" data-view="matchup" type="button">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3l4 4-4 4"/><path d="M20 7H4"/><path d="M8 21l-4-4 4-4"/><path d="M4 17h16"/></svg>
+            Matchup
+          </button>
+          <button class="tab" data-view="rankings" type="button">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15l-2 5l-4 -4l-5 2l2 -5l-2 -5l5 2l4 -4l2 5l5 -2l-2 5l2 5l-5 -2z"/></svg>
+            Global Rankings
+          </button>
+          <button class="tab" data-view="disclosure" type="button">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            Disclosure
+          </button>
+        </nav>
+
+        <div class="header-actions">
+          <button id="theme-toggle" class="icon-button" type="button" aria-label="Toggle theme" title="Toggle dark/light mode">
+            <span class="theme-icon">🌙</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Matchup View -->
+      <section id="matchup-view" class="view is-visible" aria-labelledby="matchup-title">
+        <div class="intro-row">
+          <div>
+            <h2 id="matchup-title">Who do you like better?</h2>
+          </div>
+          <div class="action-buttons">
+            <button id="reset-button" class="text-button danger" type="button">Reset rankings</button>
+          </div>
+        </div>
+
+        <div id="loading-state" class="loading-state">
+          <div class="spinner"></div>
+          <span>Loading Pokédex data…</span>
+        </div>
+
+        <div id="matchup-board" class="matchup-board" hidden>
+          <article class="pokemon-card" id="card-a" tabindex="0">
+            <div class="pokemon-art-wrap">
+              <img alt="Pokémon Left" loading="eager" />
+            </div>
+            <div class="pokemon-card-info">
+              <span class="dex-number"></span>
+              <h3></h3>
+            </div>
+            <div class="card-stats-pill">
+              <span class="user-record">Global Record: 0-0</span>
+              <span class="win-rate">0%</span>
+            </div>
+            <button class="pick-button" type="button">
+              <span>Pick this one</span>
+            </button>
+          </article>
+
+          <div class="versus" aria-hidden="true">
+            <span>VS</span>
+          </div>
+
+          <article class="pokemon-card" id="card-b" tabindex="0">
+            <div class="pokemon-art-wrap">
+              <img alt="Pokémon Right" loading="eager" />
+            </div>
+            <div class="pokemon-card-info">
+              <span class="dex-number"></span>
+              <h3></h3>
+            </div>
+            <div class="card-stats-pill">
+              <span class="user-record">Global Record: 0-0</span>
+              <span class="win-rate">0%</span>
+            </div>
+            <button class="pick-button" type="button">
+              <span>Pick this one</span>
+            </button>
+          </article>
+        </div>
+      </section>
+
+      <!-- Rankings View -->
+      <section id="rankings-view" class="view" aria-labelledby="rankings-title" hidden>
+        <div class="intro-row">
+          <div>
+            <h2 id="rankings-title">Global Rankings</h2>
+            <p class="subtitle">Community-wide leaderboard compiled from all public votes.</p>
+          </div>
+          <div class="ranking-actions">
+            <button id="share-button" class="text-button primary" type="button">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+              Share Top 10
+            </button>
+            <span id="ranking-summary" class="summary-pill">0 global matchups</span>
+          </div>
+        </div>
+
+        <!-- Search & Filter Controls -->
+        <div class="filter-bar">
+          <div class="search-wrap">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="search" id="search-input" placeholder="Search Pokémon by name or #number..." aria-label="Search Pokémon" />
+          </div>
+          
+          <div class="gen-select-wrap">
+            <label for="gen-filter">Gen:</label>
+            <select id="gen-filter">
+              <option value="all">All Generations (1–9)</option>
+              <option value="1">Gen 1 (Kanto #1–151)</option>
+              <option value="2">Gen 2 (Johto #152–251)</option>
+              <option value="3">Gen 3 (Hoenn #252–386)</option>
+              <option value="4">Gen 4 (Sinnoh #387–493)</option>
+              <option value="5">Gen 5 (Unova #494–649)</option>
+              <option value="6">Gen 6 (Kalos #650–721)</option>
+              <option value="7">Gen 7 (Alola #722–809)</option>
+              <option value="8">Gen 8 (Galar/Hisui #810–905)</option>
+              <option value="9">Gen 9 (Paldea #906–1025)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col" style="width: 70px;">Rank</th>
+                <th scope="col">Pokémon</th>
+                <th scope="col" style="width: 130px;">Global Record</th>
+                <th scope="col" style="width: 110px;">Win Rate</th>
+              </tr>
+            </thead>
+            <tbody id="ranking-rows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Disclosure View -->
+      <section id="disclosure-view" class="view" aria-labelledby="disclosure-title" hidden>
+        <div class="disclosure-card">
+          <h2 id="disclosure-title">Non-Commercial Disclosure & Copyright Notice</h2>
+          <p class="disclosure-lead">Please read the following information regarding the purpose, non-monetization, and intellectual property rights associated with this application.</p>
+          
+          <div class="disclosure-box">
+            <h3>1. Non-Commercial & Free Service</h3>
+            <p>This website is an independent, non-commercial fan application created solely for community entertainment and educational purposes. It is completely free to use, contains no advertisements, microtransactions, subscriptions, or monetization of any kind, and produces zero revenue.</p>
+          </div>
+
+          <div class="disclosure-box">
+            <h3>2. Copyright & Trademark Disclaimer</h3>
+            <p>Pokémon and Pokémon character names, images, audio, and related trademarks are registered trademarks and copyright of <strong>Nintendo</strong>, <strong>Creatures Inc.</strong>, <strong>GAME FREAK inc.</strong>, and <strong>The Pokémon Company</strong>.</p>
+            <p>This project is not affiliated with, endorsed, sponsored, or specifically authorized by Nintendo, Game Freak, or The Pokémon Company. All character artwork and trademarks referenced belong strictly to their respective owners.</p>
+          </div>
+
+          <div class="disclosure-box">
+            <h3>3. Fair Use Statement</h3>
+            <p>All assets and metadata utilized within this application are displayed under Fair Use guidelines for non-commercial commentary, research, and fan appreciation. If you are a copyright owner and wish to request asset removal, please contact the site administrator.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Footer Bar -->
+      <footer class="footer-bar">
+        <div class="footer-left">
+          <span>Global matchups completed</span>
+          <strong id="matchup-count">0</strong>
+        </div>
+        <div class="footer-right">
+          <span class="footer-tag">Pokémon artwork © Nintendo / Game Freak</span>
+        </div>
+      </footer>
+    </main>
+
+    <!-- Bundled Pokédex dataset & Application logic -->
+    <script src="pokemon_data.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

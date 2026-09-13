@@ -11,7 +11,8 @@ const state = {
   globalMatchups: 0,
   current: [],
   searchQuery: "",
-  selectedGen: "all",
+  selectedGens: new Set([1, 2, 3, 4, 5, 6, 7, 8, 9]),
+  sortBy: "composite",
   hasApiBackend: false,
 };
 
@@ -347,13 +348,20 @@ function choose(winner) {
   renderRankings();
 }
 
+function getWinRate(stats) {
+  const total = stats.wins + stats.losses;
+  return total ? stats.wins / total : 0;
+}
+
 function getSortedPokemon() {
   return [...state.pokemon].sort((a, b) => {
     const sa = getGlobalStats(a.number), sb = getGlobalStats(b.number);
     const ovrA = calculateOvr(sa), ovrB = calculateOvr(sb);
-    const totalA = sa.wins + sa.losses, totalB = sb.wins + sb.losses;
-    const rateA = totalA ? sa.wins / totalA : 0, rateB = totalB ? sb.wins / totalB : 0;
+    const rateA = getWinRate(sa), rateB = getWinRate(sb);
 
+    if (state.sortBy === "winRate") {
+      return rateB - rateA || ovrB - ovrA || sb.wins - sa.wins || a.number - b.number;
+    }
     return ovrB - ovrA || rateB - rateA || sb.wins - sa.wins || a.number - b.number;
   });
 }
@@ -362,10 +370,9 @@ function renderRankings() {
   const sorted = getSortedPokemon();
 
   const query = state.searchQuery.toLowerCase().trim();
-  const genFilter = state.selectedGen;
 
   const filtered = sorted.filter((pokemon) => {
-    const matchesGen = genFilter === "all" || String(pokemon.gen) === genFilter;
+    const matchesGen = state.selectedGens.has(pokemon.gen);
     const matchesSearch =
       !query ||
       pokemon.name.toLowerCase().includes(query) ||
@@ -382,7 +389,10 @@ function renderRankings() {
   if (!tbody) return;
 
   if (filtered.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 30px;">No Pokémon found matching your query.</td></tr>`;
+    const emptyMsg = state.selectedGens.size === 0
+      ? "Select at least one generation to view rankings."
+      : "No Pokémon found matching your query.";
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 30px;">${emptyMsg}</td></tr>`;
     return;
   }
 
@@ -480,12 +490,44 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   }
 
-  const genFilter = $("#gen-filter");
-  if (genFilter) {
-    genFilter.onchange = (e) => {
-      state.selectedGen = e.target.value;
+  $$(".sort-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.sortBy = btn.dataset.sort;
+      $$(".sort-btn").forEach((b) => b.classList.toggle("is-active", b === btn));
       renderRankings();
-    };
+    });
+  });
+
+  const genToggleGroup = $("#gen-toggle-group");
+  if (genToggleGroup) {
+    genToggleGroup.addEventListener("click", (e) => {
+      const btn = e.target.closest(".gen-btn");
+      if (!btn) return;
+      const gen = Number(btn.dataset.gen);
+      if (state.selectedGens.has(gen)) {
+        state.selectedGens.delete(gen);
+        btn.classList.remove("is-active");
+      } else {
+        state.selectedGens.add(gen);
+        btn.classList.add("is-active");
+      }
+      renderRankings();
+    });
+  }
+
+  const genToggleAll = $("#gen-toggle-all");
+  if (genToggleAll) {
+    genToggleAll.addEventListener("click", () => {
+      const allSelected = state.selectedGens.size === 9;
+      if (allSelected) {
+        state.selectedGens.clear();
+        $$(".gen-btn").forEach((b) => b.classList.remove("is-active"));
+      } else {
+        for (let g = 1; g <= 9; g++) state.selectedGens.add(g);
+        $$(".gen-btn").forEach((b) => b.classList.add("is-active"));
+      }
+      renderRankings();
+    });
   }
 
   // Share button

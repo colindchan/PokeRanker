@@ -98,24 +98,13 @@ button, input, select {
 
 .brand {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
 }
 
-.brand-badge {
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--primary-color);
-}
-
-.brand h1 {
-  margin: 0;
-  font-family: "Space Grotesk", sans-serif;
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+.brand-logo {
+  height: 28px;
+  width: auto;
+  display: block;
 }
 
 .tabs {
@@ -467,23 +456,107 @@ h2 {
   box-shadow: 0 0 0 3px var(--primary-light);
 }
 
-.gen-select-wrap {
+.filter-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.sort-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: var(--bg-subtle);
+  padding: 4px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.sort-btn {
+  border: 0;
+  padding: 7px 12px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.sort-btn:hover {
+  color: var(--text-primary);
+}
+
+.sort-btn.is-active {
+  color: var(--text-primary);
+  background-color: var(--bg-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.gen-filter-bar {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 600;
+  gap: 10px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.gen-toggle-group {
+  display: inline-flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.gen-btn {
+  display: grid;
+  place-items: center;
+  min-width: 34px;
+  height: 34px;
+  padding: 0 6px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-surface);
+  color: var(--text-muted);
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.gen-btn:hover {
+  border-color: var(--border-strong);
   color: var(--text-secondary);
 }
 
-.gen-select-wrap select {
-  padding: 10px 14px;
+.gen-btn.is-active {
+  color: #fff;
+  background-color: var(--primary-color);
+  border-color: var(--primary-color);
+}
+
+.gen-all-btn {
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
+  padding: 7px 12px;
+  border-radius: var(--radius-sm);
   background-color: var(--bg-surface);
-  color: var(--text-primary);
-  font-size: 13px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
   cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.gen-all-btn:hover {
+  background-color: var(--bg-subtle);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
 }
 
 .summary-pill {
@@ -669,6 +742,10 @@ td:first-child {
   .pokemon-art-wrap img { height: 180px; }
   .versus span { width: 38px; height: 38px; font-size: 11px; }
   .filter-bar { flex-direction: column; align-items: stretch; }
-  .gen-select-wrap select { width: 100%; }
+  .sort-toggle { width: 100%; }
+  .sort-btn { flex: 1; text-align: center; }
+  .gen-filter-bar { gap: 8px; }
+  .gen-toggle-group { flex: 1; }
+  .gen-btn { flex: 1; min-width: 0; }
   .disclosure-card { padding: 20px; }
 }

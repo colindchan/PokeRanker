@@ -27,8 +27,7 @@
       <!-- Header Bar -->
       <header class="topbar">
         <div class="brand">
-          <span class="brand-badge">Made by Colin C.</span>
-          <h1>PokéRanker</h1>
+          <img src="assets/indopride-logo.png" alt="PokéRanker" class="brand-logo" />
         </div>
 
         <nav class="tabs" aria-label="Main navigation">
@@ -135,22 +134,28 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input type="search" id="search-input" placeholder="Search Pokémon by name or #number..." aria-label="Search Pokémon" />
           </div>
-          
-          <div class="gen-select-wrap">
-            <label for="gen-filter">Gen:</label>
-            <select id="gen-filter">
-              <option value="all">All Generations (1–9)</option>
-              <option value="1">Gen 1 (Kanto #1–151)</option>
-              <option value="2">Gen 2 (Johto #152–251)</option>
-              <option value="3">Gen 3 (Hoenn #252–386)</option>
-              <option value="4">Gen 4 (Sinnoh #387–493)</option>
-              <option value="5">Gen 5 (Unova #494–649)</option>
-              <option value="6">Gen 6 (Kalos #650–721)</option>
-              <option value="7">Gen 7 (Alola #722–809)</option>
-              <option value="8">Gen 8 (Galar/Hisui #810–905)</option>
-              <option value="9">Gen 9 (Paldea #906–1025)</option>
-            </select>
+
+          <div class="sort-toggle" role="group" aria-label="Sort rankings by">
+            <span class="filter-label">Sort:</span>
+            <button class="sort-btn is-active" data-sort="composite" type="button">Composite OVR</button>
+            <button class="sort-btn" data-sort="winRate" type="button">Raw Win %</button>
           </div>
+        </div>
+
+        <div class="gen-filter-bar">
+          <span class="filter-label">Generations:</span>
+          <div class="gen-toggle-group" id="gen-toggle-group" role="group" aria-label="Filter by generation">
+            <button class="gen-btn is-active" data-gen="1" type="button" title="Gen 1 — Kanto">I</button>
+            <button class="gen-btn is-active" data-gen="2" type="button" title="Gen 2 — Johto">II</button>
+            <button class="gen-btn is-active" data-gen="3" type="button" title="Gen 3 — Hoenn">III</button>
+            <button class="gen-btn is-active" data-gen="4" type="button" title="Gen 4 — Sinnoh">IV</button>
+            <button class="gen-btn is-active" data-gen="5" type="button" title="Gen 5 — Unova">V</button>
+            <button class="gen-btn is-active" data-gen="6" type="button" title="Gen 6 — Kalos">VI</button>
+            <button class="gen-btn is-active" data-gen="7" type="button" title="Gen 7 — Alola">VII</button>
+            <button class="gen-btn is-active" data-gen="8" type="button" title="Gen 8 — Galar/Hisui">VIII</button>
+            <button class="gen-btn is-active" data-gen="9" type="button" title="Gen 9 — Paldea">IX</button>
+          </div>
+          <button id="gen-toggle-all" class="gen-all-btn" type="button">All</button>
         </div>
 
         <div class="table-wrap">

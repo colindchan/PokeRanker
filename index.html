@@ -43,6 +43,10 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
             Disclosure
           </button>
+          <button class="tab" data-view="about" type="button">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            About
+          </button>
         </nav>
 
         <div class="header-actions">
@@ -194,6 +198,32 @@
           <div class="disclosure-box">
             <h3>3. Fair Use Statement</h3>
             <p>All assets and metadata utilized within this application are displayed under Fair Use guidelines for non-commercial commentary, research, and fan appreciation. If you are a copyright owner and wish to request asset removal, please contact the site administrator.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- About View -->
+      <section id="about-view" class="view" aria-labelledby="about-title" hidden>
+        <div class="about-layout">
+          <div class="about-pikachu-wrap">
+            <img
+              class="about-pikachu"
+              src="part_01/0025_pikachu.png"
+              alt="Pikachu"
+              onerror="this.onerror=null; this.src='https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/25.png'"
+            />
+          </div>
+          <div class="about-content">
+            <h2 id="about-title">About PokéRanker</h2>
+            <p class="about-lead">Made by <strong>Colin Chan</strong> &mdash; 2026</p>
+            <p>PokéRanker is a personal side project and social experiment built to answer one deceptively simple question: <em>which Pokémon do people actually like best?</em></p>
+            <p>Rather than relying on polls or tier lists, PokéRanker uses a continuous head-to-head matchup system — every vote is a direct comparison between two randomly selected Pokémon. Over time, the accumulated data builds a global community ranking across all 1,025 Pokémon, weighted by an Elo-based algorithm that rewards wins against strong opponents more than wins against weak ones.</p>
+            <p>The project is entirely non-commercial, runs on no budget, and is kept deliberately simple by design. It&rsquo;s an experiment in collective taste &mdash; a snapshot of what the community values when stripped of nostalgia bias and asked to choose one at a time.</p>
+            <div class="about-meta">
+              <span class="about-tag">🎁 Free For Everyone</span>
+              <span class="about-tag">🌍 Community-Driven</span>
+              <span class="about-tag">✨ More features coming soon!</span>
+            </div>
           </div>
         </div>
       </section>

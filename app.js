@@ -474,7 +474,7 @@ document.addEventListener("DOMContentLoaded", () => {
   $$(".tab").forEach((tab) =>
     tab.addEventListener("click", () => {
       $$(".tab").forEach((item) => item.classList.toggle("is-active", item === tab));
-      ["matchup", "rankings", "disclosure"].forEach((view) => {
+      ["matchup", "rankings", "disclosure", "about"].forEach((view) => {
         const el = $(`#${view}-view`);
         if (el) el.hidden = tab.dataset.view !== view;
       });

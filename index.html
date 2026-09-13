@@ -204,21 +204,31 @@
 
       <!-- About View -->
       <section id="about-view" class="view" aria-labelledby="about-title" hidden>
-        <div class="about-layout">
-          <div class="about-pikachu-wrap">
+        <div class="disclosure-card">
+          <div class="about-card-header">
             <img
               class="about-pikachu"
               src="part_01/0025_pikachu.png"
               alt="Pikachu"
               onerror="this.onerror=null; this.src='https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/25.png'"
             />
-          </div>
-          <div class="about-content">
             <h2 id="about-title">About PokéRanker</h2>
-            <p class="about-lead">Made by <strong>Colin Chan</strong> &mdash; 2026</p>
-            <p>PokéRanker is a personal side project and social experiment built to answer one deceptively simple question: <em>which Pokémon do people actually like best?</em></p>
-            <p>Rather than relying on polls or tier lists, PokéRanker uses a continuous head-to-head matchup system — every vote is a direct comparison between two randomly selected Pokémon. Over time, the accumulated data builds a global community ranking across all 1,025 Pokémon, weighted by an Elo-based algorithm that rewards wins against strong opponents more than wins against weak ones.</p>
-            <p>The project is entirely non-commercial, runs on no budget, and is kept deliberately simple by design. It&rsquo;s an experiment in collective taste &mdash; a snapshot of what the community values when stripped of nostalgia bias and asked to choose one at a time.</p>
+            <p class="disclosure-lead">Made by <strong>Colin Chan</strong> &mdash; 2026</p>
+          </div>
+
+          <div class="disclosure-box">
+            <h3>1. What is PokéRanker?</h3>
+            <p>PokéRanker is a personal side project and social experiment built to answer one deceptively simple question: <em>which Pokémon do people actually like best?</em> Rather than relying on polls or pre-made tier lists, it collects real votes from real people and lets the data speak for itself.</p>
+          </div>
+
+          <div class="disclosure-box">
+            <h3>2. How Does It Work?</h3>
+            <p>Every session presents a random head-to-head matchup between two Pokémon. Your vote is a direct, side-by-side comparison &mdash; no context, no categories, just instinct. Over time, thousands of matchups build a global community leaderboard across all 1,025 Pokémon, weighted by an Elo-based algorithm that rewards wins against strong opponents more than wins against weak ones.</p>
+          </div>
+
+          <div class="disclosure-box">
+            <h3>3. A Note from the Creator</h3>
+            <p>This project is entirely non-commercial, runs on no budget, and is kept deliberately simple by design. It&rsquo;s an experiment in collective taste &mdash; a snapshot of what the community values when stripped of nostalgia bias and asked to choose one at a time. More features are on the way.</p>
             <div class="about-meta">
               <span class="about-tag">🎁 Free For Everyone</span>
               <span class="about-tag">🌍 Community-Driven</span>

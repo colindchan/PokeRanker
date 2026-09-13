@@ -80,18 +80,28 @@ function parseCsvLine(line) {
   return values;
 }
 
-// Sync global data with server API
+// Sync global data with server API (Includes Auto-Restore Protection)
 async function syncGlobalApiData() {
   try {
     const res = await fetch(`${API_BASE_URL}/api/stats`);
     if (res.ok) {
       const data = await res.json();
       state.hasApiBackend = true;
-      if (data.totalMatchups !== undefined) {
-        state.globalMatchups = data.totalMatchups;
-      }
-      if (data.stats) {
-        state.globalResults = data.stats;
+      const serverTotal = data.totalMatchups || 0;
+
+      if (serverTotal >= state.globalMatchups) {
+        state.globalMatchups = serverTotal;
+        if (data.stats) {
+          state.globalResults = data.stats;
+        }
+        saveGlobalState();
+      } else if (state.globalMatchups > 0) {
+        // Auto-restore server data if server restarted/reset
+        await fetch(`${API_BASE_URL}/api/sync`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ totalMatchups: state.globalMatchups, stats: state.globalResults }),
+        });
       }
       renderMatchup();
       renderRankings();

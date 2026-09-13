@@ -74,6 +74,42 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // POST /api/sync -> Auto-restore / merge client cached global votes
+  if (req.method === "POST" && url.pathname === "/api/sync") {
+    let body = "";
+    req.on("data", (chunk) => { body += chunk; });
+    req.on("end", () => {
+      try {
+        const { totalMatchups, stats } = JSON.parse(body);
+        if (totalMatchups && stats) {
+          if (totalMatchups > globalData.totalMatchups) {
+            globalData.totalMatchups = totalMatchups;
+          }
+          for (const num in stats) {
+            if (!globalData.stats[num]) {
+              globalData.stats[num] = { wins: 0, losses: 0 };
+            }
+            if (stats[num].wins > globalData.stats[num].wins) {
+              globalData.stats[num].wins = stats[num].wins;
+            }
+            if (stats[num].losses > globalData.stats[num].losses) {
+              globalData.stats[num].losses = stats[num].losses;
+            }
+          }
+          saveData();
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ success: true, totalMatchups: globalData.totalMatchups }));
+          return;
+        }
+      } catch (e) {
+        console.error("Invalid sync payload:", e);
+      }
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Invalid sync request" }));
+    });
+    return;
+  }
+
   // Serve static web app files
   let filePath = path.join(__dirname, url.pathname === "/" ? "index.html" : url.pathname);
   if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {

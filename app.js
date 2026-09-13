@@ -92,6 +92,30 @@ function parseCsvLine(line) {
   return values;
 }
 
+// Check all previous version keys in LocalStorage to preserve historical user data
+function loadSavedLocalStorage() {
+  const keys = [
+    "pokemon-ranker-global-v6",
+    "pokemon-ranker-global-v5",
+    "pokemon-ranker-global-v4",
+    "pokemon-ranker-global-v3",
+    "pokemon-ranker-results-v2",
+    "pokemon-ranker-results-v1"
+  ];
+  for (const k of keys) {
+    const raw = localStorage.getItem(k);
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed && (parsed.matchups > 0 || (parsed.results && Object.keys(parsed.results).length > 0))) {
+          return parsed;
+        }
+      } catch (e) {}
+    }
+  }
+  return null;
+}
+
 // Sync global data with server API
 async function syncGlobalApiData() {
   try {
@@ -169,8 +193,8 @@ async function loadPokemonData() {
     });
   }
 
-  // Load local storage fallback
-  const savedGlobal = JSON.parse(localStorage.getItem(GLOBAL_STORAGE_KEY) || "null");
+  // Load local storage fallback across all historical version keys
+  const savedGlobal = loadSavedLocalStorage();
   if (savedGlobal) {
     state.globalResults = savedGlobal.results || {};
     state.headToHead = savedGlobal.headToHead || {};

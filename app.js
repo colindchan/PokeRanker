@@ -28,12 +28,6 @@ function showToast(message) {
   setTimeout(() => { toast.hidden = true; }, 3000);
 }
 
-// Read tracked Elo rating, defaulting to the 1500 baseline
-function getEloFromStats(stats) {
-  if (!stats || stats.elo === undefined) return 1500;
-  return stats.elo;
-}
-
 // Wilson score lower bound: a record-based confidence score in [0, 1] that never
 // disagrees with the raw win/loss record (more wins & fewer losses always scores
 // at least as high), and doesn't overrate small sample sizes (e.g. a 1-0 record).
@@ -46,10 +40,9 @@ function wilsonScore(wins, losses) {
   return (phat + z2 / (2 * n) - z * Math.sqrt((phat * (1 - phat) + z2 / (4 * n)) / n)) / (1 + z2 / n);
 }
 
-// Calculate NBA 2K Style OVR rating (Scale 60 to 99)
-// Primarily driven by the win/loss record (via Wilson score, so it's always
-// consistent with what's displayed), with a small capped nudge from the
-// opponent-strength-weighted Elo rating for extra nuance.
+// Calculate NBA 2K Style OVR rating (Scale 60 to 99), driven entirely by the
+// win/loss record via Wilson score, so it's always consistent with what's
+// displayed and needs no separately-tracked rating that could drift from it.
 function calculateOvr(stats) {
   if (!stats) return 75;
   const wins = stats.wins || 0;
@@ -58,12 +51,7 @@ function calculateOvr(stats) {
   if (!total) return 75;
 
   const wilson = wilsonScore(wins, losses);
-  const recordOvr = 75 + (wilson - 0.5) * 48; // 0 -> 51, 0.5 -> 75, 1 -> 99
-
-  const elo = getEloFromStats(stats);
-  const eloAdj = Math.max(-5, Math.min(5, Math.round((elo - 1500) / 50)));
-
-  const ovr = Math.round(recordOvr + eloAdj);
+  const ovr = Math.round(75 + (wilson - 0.5) * 48); // 0 -> 51, 0.5 -> 75, 1 -> 99
   return Math.min(99, Math.max(60, ovr));
 }
 
@@ -281,27 +269,9 @@ function saveGlobalState() {
 
 function getGlobalStats(number) {
   if (!state.globalResults[number]) {
-    state.globalResults[number] = { wins: 0, losses: 0, elo: 1500 };
+    state.globalResults[number] = { wins: 0, losses: 0 };
   }
   return state.globalResults[number];
-}
-
-// Local Elo update (opponent-strength weighted)
-function updateLocalElo(winnerNum, loserNum) {
-  const winnerStats = getGlobalStats(winnerNum);
-  const loserStats = getGlobalStats(loserNum);
-
-  const rW = getEloFromStats(winnerStats);
-  const rL = getEloFromStats(loserStats);
-
-  const expectedW = 1 / (1 + Math.pow(10, (rL - rW) / 400));
-  const K = 32;
-
-  winnerStats.elo = Math.round(rW + K * (1 - expectedW));
-  loserStats.elo = Math.round(rL - K * (1 - expectedW));
-
-  state.globalResults[winnerNum] = winnerStats;
-  state.globalResults[loserNum] = loserStats;
 }
 
 function randomPair() {
@@ -376,9 +346,6 @@ function choose(winner) {
   // Head to Head tracking
   const h2hKey = `${winner.number}_vs_${loser.number}`;
   state.headToHead[h2hKey] = (state.headToHead[h2hKey] || 0) + 1;
-
-  // Elo rating update based on opponent strength
-  updateLocalElo(winner.number, loser.number);
 
   state.globalMatchups += 1;
   saveGlobalState();

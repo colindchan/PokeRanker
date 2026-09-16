@@ -8,7 +8,7 @@ const DATA_FILE = path.join(__dirname, "global_stats.json");
 // Load or initialize global data
 let globalData = {
   totalMatchups: 0,
-  stats: {}, // pokemon_number -> { wins, losses, elo }
+  stats: {}, // pokemon_number -> { wins, losses }
   headToHead: {} // "winner_vs_loser" -> count
 };
 
@@ -19,6 +19,12 @@ if (fs.existsSync(DATA_FILE)) {
     globalData.totalMatchups = parsed.totalMatchups || 0;
     globalData.stats = parsed.stats || {};
     globalData.headToHead = parsed.headToHead || {};
+
+    // Ranking is now driven purely by wins/losses (no more Elo tracking),
+    // so drop any leftover elo field from previously-saved data.
+    for (const num in globalData.stats) {
+      delete globalData.stats[num].elo;
+    }
   } catch (e) {
     console.error("Error reading global_stats.json, starting fresh.");
   }
@@ -26,33 +32,6 @@ if (fs.existsSync(DATA_FILE)) {
 
 function saveData() {
   fs.writeFileSync(DATA_FILE, JSON.stringify(globalData, null, 2), "utf8");
-}
-
-// Calculate Elo update
-function getElo(num) {
-  if (!globalData.stats[num]) {
-    globalData.stats[num] = { wins: 0, losses: 0, elo: 1500 };
-  }
-  if (globalData.stats[num].elo === undefined) {
-    globalData.stats[num].elo = 1500;
-  }
-  return globalData.stats[num].elo;
-}
-
-function updateElo(winnerNum, loserNum) {
-  const rWinner = getElo(winnerNum);
-  const rLoser = getElo(loserNum);
-
-  // Expected win probability for winner
-  const expectedWinner = 1 / (1 + Math.pow(10, (rLoser - rWinner) / 400));
-  const expectedLoser = 1 - expectedWinner;
-
-  const K = 32;
-  const newWinnerElo = Math.round(rWinner + K * (1 - expectedWinner));
-  const newLoserElo = Math.round(rLoser + K * (0 - expectedLoser));
-
-  globalData.stats[winnerNum].elo = newWinnerElo;
-  globalData.stats[loserNum].elo = newLoserElo;
 }
 
 const server = http.createServer((req, res) => {
@@ -84,8 +63,8 @@ const server = http.createServer((req, res) => {
       try {
         const { winner, loser } = JSON.parse(body);
         if (winner && loser) {
-          if (!globalData.stats[winner]) globalData.stats[winner] = { wins: 0, losses: 0, elo: 1500 };
-          if (!globalData.stats[loser]) globalData.stats[loser] = { wins: 0, losses: 0, elo: 1500 };
+          if (!globalData.stats[winner]) globalData.stats[winner] = { wins: 0, losses: 0 };
+          if (!globalData.stats[loser]) globalData.stats[loser] = { wins: 0, losses: 0 };
 
           globalData.stats[winner].wins += 1;
           globalData.stats[loser].losses += 1;
@@ -94,9 +73,6 @@ const server = http.createServer((req, res) => {
           // Record Head-to-Head
           const h2hKey = `${winner}_vs_${loser}`;
           globalData.headToHead[h2hKey] = (globalData.headToHead[h2hKey] || 0) + 1;
-
-          // Update Elo Rating based on opponent strength
-          updateElo(winner, loser);
 
           saveData();
 
@@ -126,21 +102,14 @@ const server = http.createServer((req, res) => {
           }
           for (const num in stats) {
             const incoming = stats[num] || {};
-            const incomingTotal = (incoming.wins || 0) + (incoming.losses || 0);
-            const current = globalData.stats[num];
-            const currentTotal = current ? current.wins + current.losses : -1;
-
-            // Treat wins/losses/elo as one atomic snapshot: adopt the incoming
-            // record wholesale only if it reflects more games than what we have,
-            // so an Elo rating never gets separated from the record it belongs to.
-            if (incomingTotal > currentTotal) {
-              globalData.stats[num] = {
-                wins: incoming.wins || 0,
-                losses: incoming.losses || 0,
-                elo: incoming.elo || 1500,
-              };
-            } else if (!current) {
-              globalData.stats[num] = { wins: 0, losses: 0, elo: 1500 };
+            if (!globalData.stats[num]) {
+              globalData.stats[num] = { wins: 0, losses: 0 };
+            }
+            if ((incoming.wins || 0) > globalData.stats[num].wins) {
+              globalData.stats[num].wins = incoming.wins;
+            }
+            if ((incoming.losses || 0) > globalData.stats[num].losses) {
+              globalData.stats[num].losses = incoming.losses;
             }
           }
           if (headToHead) {

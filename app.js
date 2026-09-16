@@ -288,6 +288,8 @@ function randomPair() {
   return [state.pokemon[first], state.pokemon[second]];
 }
 
+// Cards deliberately don't show OVR/record/win rate — showing performance
+// stats at decision time would bias the vote toward what's already popular.
 function fillCard(id, pokemon) {
   const card = $(`#${id}`);
   if (!card) return;
@@ -297,21 +299,6 @@ function fillCard(id, pokemon) {
 
   card.querySelector(".dex-number").textContent = `#${String(pokemon.number).padStart(4, "0")}`;
   card.querySelector("h3").textContent = pokemon.name;
-
-  const stats = getGlobalStats(pokemon.number);
-  const ovr = calculateOvr(stats);
-
-  const badgeEl = card.querySelector(".ovr-badge");
-  if (badgeEl) {
-    badgeEl.textContent = `${ovr} OVR`;
-    badgeEl.className = `ovr-badge ${getOvrClass(ovr)}`;
-  }
-
-  const total = stats.wins + stats.losses;
-  const winRate = total ? Math.round((stats.wins / total) * 100) : 0;
-
-  card.querySelector(".user-record").textContent = `Global Record: ${stats.wins}W - ${stats.losses}L`;
-  card.querySelector(".win-rate").textContent = total ? `${winRate}% win rate` : "No votes";
 
   const btn = card.querySelector(".pick-button");
   btn.onclick = () => choose(pokemon);
@@ -405,6 +392,8 @@ function getSortedPokemon() {
 
 function renderRankings() {
   const sorted = getSortedPokemon();
+  const globalRank = new Map();
+  sorted.forEach((pokemon, index) => globalRank.set(pokemon.number, index + 1));
 
   const query = state.searchQuery.toLowerCase().trim();
 
@@ -434,7 +423,7 @@ function renderRankings() {
   }
 
   tbody.innerHTML = filtered
-    .map((pokemon, index) => {
+    .map((pokemon) => {
       const stats = getGlobalStats(pokemon.number);
       const ovr = calculateOvr(stats);
       const ovrClass = getOvrClass(ovr);
@@ -445,7 +434,7 @@ function renderRankings() {
 
       return `
       <tr>
-        <td>#${index + 1}</td>
+        <td>#${globalRank.get(pokemon.number)}</td>
         <td><span class="ovr-badge ${ovrClass}">${ovr}</span></td>
         <td>
           <div class="rank-name">

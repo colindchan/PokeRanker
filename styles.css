@@ -431,7 +431,7 @@ h2 {
   gap: 12px;
   border-top: 1px solid var(--border-color);
   padding-top: 12px;
-  margin-bottom: 8px;
+  margin-bottom: 16px;
 }
 
 .dex-number {
@@ -447,23 +447,6 @@ h2 {
   font-size: 22px;
   font-weight: 700;
   text-align: right;
-}
-
-.card-stats-pill {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 12px;
-  color: var(--text-muted);
-  background-color: var(--bg-subtle);
-  padding: 6px 10px;
-  border-radius: var(--radius-sm);
-  margin-bottom: 14px;
-}
-
-.card-stats-pill .win-rate {
-  font-weight: 700;
-  color: var(--text-secondary);
 }
 
 .pick-button {
@@ -875,11 +858,9 @@ td:first-child {
   .pokemon-card { min-height: 0; padding: 12px; }
   .pokemon-art-wrap { padding: 4px 0; }
   .pokemon-art-wrap img { max-height: 130px; }
-  .pokemon-card-info { padding-top: 8px; margin-bottom: 6px; }
+  .pokemon-card-info { padding-top: 8px; margin-bottom: 10px; }
   .pokemon-card h3 { font-size: 15px; }
   .dex-number { font-size: 11px; }
-  .ovr-badge { font-size: 10px; padding: 2px 6px; }
-  .card-stats-pill { font-size: 10px; padding: 5px 8px; margin-bottom: 10px; }
   .pick-button { padding: 9px 10px; font-size: 13px; }
   .versus span { width: 26px; height: 26px; font-size: 8px; border-width: 1px; }
 

@@ -318,6 +318,40 @@ function fillCard(id, pokemon) {
   };
 }
 
+// Animate a number counting up/down to its new value instead of snapping
+function animateCount(el, endValue) {
+  if (!el) return;
+  const startValue = Number(el.dataset.rawValue || 0) || 0;
+  if (startValue === endValue) {
+    el.textContent = endValue.toLocaleString();
+    el.dataset.rawValue = String(endValue);
+    return;
+  }
+  const duration = 400;
+  const startTime = performance.now();
+  function tick(now) {
+    const progress = Math.min((now - startTime) / duration, 1);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    el.textContent = Math.round(startValue + (endValue - startValue) * eased).toLocaleString();
+    if (progress < 1) {
+      requestAnimationFrame(tick);
+    } else {
+      el.dataset.rawValue = String(endValue);
+    }
+  }
+  requestAnimationFrame(tick);
+}
+
+// Restart a CSS animation on an element that's already rendered (toggling
+// the class alone wouldn't replay it, since the browser only (re)starts an
+// animation when the property is freshly applied after a reflow).
+function replayAnimation(el, className) {
+  if (!el) return;
+  el.classList.remove(className);
+  void el.offsetWidth;
+  el.classList.add(className);
+}
+
 function renderMatchup() {
   state.current = randomPair();
   if (state.current.length < 2) return;
@@ -325,17 +359,29 @@ function renderMatchup() {
   fillCard("card-a", state.current[0]);
   fillCard("card-b", state.current[1]);
 
+  const cardA = $("#card-a");
+  const cardB = $("#card-b");
+  if (cardA) cardA.classList.remove("card-picked");
+  if (cardB) cardB.classList.remove("card-picked");
+  replayAnimation(cardA, "card-refresh");
+  replayAnimation(cardB, "card-refresh");
+
   const loadingEl = $("#loading-state");
   const boardEl = $("#matchup-board");
   if (loadingEl) loadingEl.hidden = true;
   if (boardEl) boardEl.hidden = false;
 
-  $("#matchup-count").textContent = state.globalMatchups.toLocaleString();
+  animateCount($("#matchup-count"), state.globalMatchups);
 }
 
 function choose(winner) {
   const loser = state.current.find((p) => p.number !== winner.number);
   if (!loser) return;
+
+  // Brief pulse on the picked card before the next matchup replaces it
+  const winnerCardId = state.current[0].number === winner.number ? "card-a" : "card-b";
+  const winnerCardEl = $(`#${winnerCardId}`);
+  if (winnerCardEl) winnerCardEl.classList.add("card-picked");
 
   // Local state update
   const winnerStats = getGlobalStats(winner.number);
@@ -353,8 +399,10 @@ function choose(winner) {
   // Send vote to backend API
   sendVoteToApi(winner.number, loser.number);
 
-  renderMatchup();
-  renderRankings();
+  setTimeout(() => {
+    renderMatchup();
+    renderRankings();
+  }, 160);
 }
 
 function getWinRate(stats) {
@@ -469,26 +517,43 @@ document.addEventListener("DOMContentLoaded", () => {
   document.documentElement.setAttribute("data-theme", savedTheme);
   const themeBtn = $("#theme-toggle");
   if (themeBtn) {
-    themeBtn.querySelector(".theme-icon").textContent = savedTheme === "dark" ? "☀️" : "🌙";
+    const iconEl = themeBtn.querySelector(".theme-icon");
+    iconEl.textContent = savedTheme === "dark" ? "☀️" : "🌙";
     themeBtn.onclick = () => {
       const current = document.documentElement.getAttribute("data-theme");
       const next = current === "dark" ? "light" : "dark";
       document.documentElement.setAttribute("data-theme", next);
       localStorage.setItem(THEME_KEY, next);
-      themeBtn.querySelector(".theme-icon").textContent = next === "dark" ? "☀️" : "🌙";
+      iconEl.style.transform = "scale(0) rotate(180deg)";
+      setTimeout(() => {
+        iconEl.textContent = next === "dark" ? "☀️" : "🌙";
+        iconEl.style.transform = "scale(1) rotate(0deg)";
+      }, 150);
     };
   }
 
-  // Navigation tabs switching
+  // Navigation tabs switching, with a sliding indicator behind the active tab
+  const tabIndicator = $(".tab-indicator");
+  function moveTabIndicator(tabEl) {
+    if (!tabIndicator || !tabEl) return;
+    tabIndicator.style.width = `${tabEl.offsetWidth}px`;
+    tabIndicator.style.transform = `translateX(${tabEl.offsetLeft}px)`;
+  }
   $$(".tab").forEach((tab) =>
     tab.addEventListener("click", () => {
       $$(".tab").forEach((item) => item.classList.toggle("is-active", item === tab));
+      moveTabIndicator(tab);
       ["matchup", "rankings", "disclosure", "about"].forEach((view) => {
         const el = $(`#${view}-view`);
         if (el) el.hidden = tab.dataset.view !== view;
       });
     })
   );
+  moveTabIndicator($(".tab.is-active"));
+  window.addEventListener("resize", () => moveTabIndicator($(".tab.is-active")));
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(() => moveTabIndicator($(".tab.is-active")));
+  }
 
   // Search & Gen Filters
   const searchInput = $("#search-input");

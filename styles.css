@@ -28,6 +28,8 @@
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 16px;
+
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 [data-theme="dark"] {
@@ -76,12 +78,17 @@ body {
   color: var(--text-primary);
   font-family: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   line-height: 1.5;
-  transition: background-color 0.2s ease, color 0.2s ease;
+  transition: background-color 0.2s var(--ease), color 0.2s var(--ease);
 }
 
 button, input, select {
   font: inherit;
   color: inherit;
+}
+
+@keyframes appIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* App Shell — fills the viewport exactly; header/footer stay fixed in place
@@ -92,6 +99,7 @@ button, input, select {
   margin: 0 auto;
   display: flex;
   flex-direction: column;
+  animation: appIn 0.4s var(--ease);
 }
 
 /* Header & Navigation */
@@ -120,6 +128,7 @@ button, input, select {
 }
 
 .tabs {
+  position: relative;
   display: inline-flex;
   background-color: var(--bg-subtle);
   padding: 4px;
@@ -127,7 +136,22 @@ button, input, select {
   border: 1px solid var(--border-color);
 }
 
+.tab-indicator {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 0;
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-surface);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.25s var(--ease), width 0.25s var(--ease);
+  pointer-events: none;
+  z-index: 0;
+}
+
 .tab {
+  position: relative;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -139,7 +163,7 @@ button, input, select {
   cursor: pointer;
   font-weight: 600;
   font-size: 14px;
-  transition: all 0.15s ease;
+  transition: color 0.15s var(--ease), transform 0.15s var(--ease);
 }
 
 .tab:hover {
@@ -148,8 +172,10 @@ button, input, select {
 
 .tab.is-active {
   color: var(--text-primary);
-  background-color: var(--bg-surface);
-  box-shadow: var(--shadow-sm);
+}
+
+.tab:active {
+  transform: scale(0.96);
 }
 
 .header-actions {
@@ -167,7 +193,7 @@ button, input, select {
   background: var(--bg-surface);
   cursor: pointer;
   font-size: 16px;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition: background-color 0.15s var(--ease), border-color 0.15s var(--ease), transform 0.15s var(--ease);
 }
 
 .icon-button:hover {
@@ -175,12 +201,27 @@ button, input, select {
   border-color: var(--border-strong);
 }
 
+.icon-button:active {
+  transform: scale(0.92);
+}
+
+.theme-icon {
+  display: inline-block;
+  transition: transform 0.2s var(--ease);
+}
+
 /* Views */
+@keyframes viewIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 .view {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   padding: 32px 0 48px;
+  animation: viewIn 0.3s var(--ease);
 }
 
 /* Matchup view lays out as a column so the board fills whatever vertical
@@ -249,7 +290,11 @@ h2 {
   cursor: pointer;
   font-size: 13px;
   font-weight: 600;
-  transition: all 0.15s ease;
+  transition: all 0.15s var(--ease);
+}
+
+.text-button:active {
+  transform: scale(0.96);
 }
 
 .text-button:hover {
@@ -311,6 +356,17 @@ h2 {
   gap: 16px;
 }
 
+@keyframes cardPop {
+  from { opacity: 0; transform: scale(0.97) translateY(4px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes cardPicked {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.025); }
+  100% { transform: scale(1); }
+}
+
 .pokemon-card {
   display: flex;
   flex-direction: column;
@@ -320,9 +376,18 @@ h2 {
   border-radius: var(--radius-lg);
   background-color: var(--bg-surface);
   box-shadow: var(--shadow-sm);
-  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: transform 0.15s var(--ease), border-color 0.15s var(--ease), box-shadow 0.15s var(--ease);
   outline: none;
   cursor: pointer;
+}
+
+.pokemon-card.card-refresh {
+  animation: cardPop 0.3s var(--ease);
+}
+
+.pokemon-card.card-picked {
+  animation: cardPicked 0.18s var(--ease);
+  border-color: var(--primary-color);
 }
 
 .pokemon-card:hover, .pokemon-card:focus-visible {
@@ -434,7 +499,11 @@ h2 {
   cursor: pointer;
   font-weight: 700;
   font-size: 15px;
-  transition: background-color 0.15s ease;
+  transition: background-color 0.15s var(--ease), transform 0.15s var(--ease);
+}
+
+.pick-button:active {
+  transform: scale(0.97);
 }
 
 .pick-button:hover {
@@ -530,7 +599,11 @@ h2 {
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
-  transition: all 0.15s ease;
+  transition: all 0.15s var(--ease);
+}
+
+.sort-btn:active {
+  transform: scale(0.96);
 }
 
 .sort-btn:hover {
@@ -571,7 +644,11 @@ h2 {
   font-size: 11px;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.15s var(--ease);
+}
+
+.gen-btn:active {
+  transform: scale(0.9);
 }
 
 .gen-btn:hover {
@@ -640,6 +717,15 @@ thead {
   position: sticky;
   top: 0;
   z-index: 2;
+}
+
+@keyframes rowIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+#ranking-rows tr {
+  animation: rowIn 0.25s var(--ease);
 }
 
 th {

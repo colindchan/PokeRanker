@@ -8,7 +8,7 @@ const DATA_FILE = path.join(__dirname, "global_stats.json");
 // Load or initialize global data
 let globalData = {
   totalMatchups: 0,
-  stats: {}, // pokemon_number -> { wins, losses, elo }
+  stats: {}, // pokemon_number -> { wins, losses }
   headToHead: {} // "winner_vs_loser" -> count
 };
 
@@ -19,6 +19,12 @@ if (fs.existsSync(DATA_FILE)) {
     globalData.totalMatchups = parsed.totalMatchups || 0;
     globalData.stats = parsed.stats || {};
     globalData.headToHead = parsed.headToHead || {};
+
+    // Ranking is driven purely by wins/losses, so drop any leftover elo
+    // field from previously-saved data.
+    for (const num in globalData.stats) {
+      delete globalData.stats[num].elo;
+    }
   } catch (e) {
     console.error("Error reading global_stats.json, starting fresh.");
   }
@@ -26,56 +32,6 @@ if (fs.existsSync(DATA_FILE)) {
 
 function saveData() {
   fs.writeFileSync(DATA_FILE, JSON.stringify(globalData, null, 2), "utf8");
-}
-
-// One-time migration: a record that already has a win/loss history but no
-// Elo yet (e.g. left over from a period when this app ranked by record
-// alone) gets a starting Elo estimated from that record, instead of every
-// such Pokemon defaulting to a flat 1500 regardless of how lopsided their
-// actual record is. This only ever checks elo === undefined (truly never
-// tracked) — never the value of elo itself — so it can't misfire on a real,
-// currently-1500 Elo the way the old buggy fallback used to.
-function seedEloFromRecord(wins, losses) {
-  const total = wins + losses;
-  if (!total) return 1500;
-  const winRate = (wins + 1) / (total + 2); // Laplace smoothing
-  const eloOffset = Math.round(400 * Math.log10(winRate / (1 - winRate)));
-  return 1500 + eloOffset;
-}
-
-(function migrateMissingElo() {
-  let migrated = false;
-  for (const num in globalData.stats) {
-    const s = globalData.stats[num];
-    if (s.elo === undefined) {
-      s.elo = seedEloFromRecord(s.wins || 0, s.losses || 0);
-      migrated = true;
-    }
-  }
-  if (migrated) saveData();
-})();
-
-// Elo rating, defaulting to and self-healing to the 1500 baseline.
-function getElo(num) {
-  if (!globalData.stats[num]) {
-    globalData.stats[num] = { wins: 0, losses: 0, elo: 1500 };
-  }
-  if (globalData.stats[num].elo === undefined) {
-    globalData.stats[num].elo = 1500;
-  }
-  return globalData.stats[num].elo;
-}
-
-function updateElo(winnerNum, loserNum) {
-  const rWinner = getElo(winnerNum);
-  const rLoser = getElo(loserNum);
-
-  const expectedWinner = 1 / (1 + Math.pow(10, (rLoser - rWinner) / 400));
-  const expectedLoser = 1 - expectedWinner;
-
-  const K = 32;
-  globalData.stats[winnerNum].elo = Math.round(rWinner + K * (1 - expectedWinner));
-  globalData.stats[loserNum].elo = Math.round(rLoser + K * (0 - expectedLoser));
 }
 
 const server = http.createServer((req, res) => {
@@ -107,8 +63,8 @@ const server = http.createServer((req, res) => {
       try {
         const { winner, loser } = JSON.parse(body);
         if (winner && loser) {
-          if (!globalData.stats[winner]) globalData.stats[winner] = { wins: 0, losses: 0, elo: 1500 };
-          if (!globalData.stats[loser]) globalData.stats[loser] = { wins: 0, losses: 0, elo: 1500 };
+          if (!globalData.stats[winner]) globalData.stats[winner] = { wins: 0, losses: 0 };
+          if (!globalData.stats[loser]) globalData.stats[loser] = { wins: 0, losses: 0 };
 
           globalData.stats[winner].wins += 1;
           globalData.stats[loser].losses += 1;
@@ -117,9 +73,6 @@ const server = http.createServer((req, res) => {
           // Record Head-to-Head
           const h2hKey = `${winner}_vs_${loser}`;
           globalData.headToHead[h2hKey] = (globalData.headToHead[h2hKey] || 0) + 1;
-
-          // Update Elo rating based on opponent strength
-          updateElo(winner, loser);
 
           saveData();
 
@@ -149,21 +102,14 @@ const server = http.createServer((req, res) => {
           }
           for (const num in stats) {
             const incoming = stats[num] || {};
-            const incomingTotal = (incoming.wins || 0) + (incoming.losses || 0);
-            const current = globalData.stats[num];
-            const currentTotal = current ? current.wins + current.losses : -1;
-
-            // Treat wins/losses/elo as one atomic snapshot: adopt the incoming
-            // record wholesale only if it reflects more games than what we have,
-            // so an Elo rating never gets separated from the record it belongs to.
-            if (incomingTotal > currentTotal) {
-              globalData.stats[num] = {
-                wins: incoming.wins || 0,
-                losses: incoming.losses || 0,
-                elo: incoming.elo || 1500,
-              };
-            } else if (!current) {
-              globalData.stats[num] = { wins: 0, losses: 0, elo: 1500 };
+            if (!globalData.stats[num]) {
+              globalData.stats[num] = { wins: 0, losses: 0 };
+            }
+            if ((incoming.wins || 0) > globalData.stats[num].wins) {
+              globalData.stats[num].wins = incoming.wins;
+            }
+            if ((incoming.losses || 0) > globalData.stats[num].losses) {
+              globalData.stats[num].losses = incoming.losses;
             }
           }
           if (headToHead) {

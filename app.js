@@ -28,22 +28,34 @@ function showToast(message) {
   setTimeout(() => { toast.hidden = true; }, 3000);
 }
 
-// Read tracked Elo rating, defaulting to the 1500 baseline. Always trusts
-// the persisted value directly (no fallback recompute from wins/losses) —
-// that fallback used to kick in whenever elo happened to equal 1500 exactly,
-// which caused a real Elo to get silently ignored. As long as getGlobalStats
-// always initializes/persists elo and updateLocalElo keeps it current, the
-// tracked value is reliable on its own.
-function getElo(stats) {
-  return stats && stats.elo !== undefined ? stats.elo : 1500;
+// Wilson score CENTER estimate (not the lower bound): shrinks a small sample
+// toward 50% instead of trusting the raw rate outright, but — unlike the
+// lower-bound version — a genuinely 50/50 record always centers on exactly
+// 0.5 no matter the sample size, rather than reading as "below average"
+// until it has a huge number of games. Converges to the raw win rate as
+// games played grows.
+function shrunkWinRate(wins, losses) {
+  const n = wins + losses;
+  if (n === 0) return 0.5;
+  const z = 1.96; // 95% confidence
+  const z2 = z * z;
+  const phat = wins / n;
+  return (phat + z2 / (2 * n)) / (1 + z2 / n);
 }
 
-// Calculate NBA 2K Style OVR rating (Scale 60 to 99) from opponent-strength
-// weighted Elo. 1500 Elo -> 75 OVR; +20 Elo = +1 OVR.
+// Calculate NBA 2K Style OVR rating (Scale 60 to 99), driven entirely by the
+// win/loss record, so it's always consistent with what's displayed and needs
+// no separately-tracked rating that could drift from it. An average (50%)
+// record always lands at 75 OVR, regardless of how many games it's played.
 function calculateOvr(stats) {
   if (!stats) return 75;
-  const elo = getElo(stats);
-  const ovr = Math.round(75 + (elo - 1500) / 20);
+  const wins = stats.wins || 0;
+  const losses = stats.losses || 0;
+  const total = wins + losses;
+  if (!total) return 75;
+
+  const rate = shrunkWinRate(wins, losses);
+  const ovr = Math.round(75 + (rate - 0.5) * 48); // 0 -> 51, 0.5 -> 75, 1 -> 99
   return Math.min(99, Math.max(60, ovr));
 }
 
@@ -261,27 +273,9 @@ function saveGlobalState() {
 
 function getGlobalStats(number) {
   if (!state.globalResults[number]) {
-    state.globalResults[number] = { wins: 0, losses: 0, elo: 1500 };
+    state.globalResults[number] = { wins: 0, losses: 0 };
   }
   return state.globalResults[number];
-}
-
-// Local Elo update (opponent-strength weighted). Both stats objects here are
-// guaranteed to be the same persisted references getGlobalStats returns, so
-// mutating them in place keeps wins/losses (already updated by choose()) and
-// elo consistent with each other.
-function updateLocalElo(winnerNum, loserNum) {
-  const winnerStats = getGlobalStats(winnerNum);
-  const loserStats = getGlobalStats(loserNum);
-
-  const rW = getElo(winnerStats);
-  const rL = getElo(loserStats);
-
-  const expectedW = 1 / (1 + Math.pow(10, (rL - rW) / 400));
-  const K = 32;
-
-  winnerStats.elo = Math.round(rW + K * (1 - expectedW));
-  loserStats.elo = Math.round(rL - K * (1 - expectedW));
 }
 
 function randomPair() {
@@ -397,9 +391,6 @@ function choose(winner) {
   // Head to Head tracking
   const h2hKey = `${winner.number}_vs_${loser.number}`;
   state.headToHead[h2hKey] = (state.headToHead[h2hKey] || 0) + 1;
-
-  // Elo rating update based on opponent strength
-  updateLocalElo(winner.number, loser.number);
 
   state.globalMatchups += 1;
   saveGlobalState();

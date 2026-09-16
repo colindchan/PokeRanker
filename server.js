@@ -125,17 +125,22 @@ const server = http.createServer((req, res) => {
             globalData.totalMatchups = totalMatchups;
           }
           for (const num in stats) {
-            if (!globalData.stats[num]) {
+            const incoming = stats[num] || {};
+            const incomingTotal = (incoming.wins || 0) + (incoming.losses || 0);
+            const current = globalData.stats[num];
+            const currentTotal = current ? current.wins + current.losses : -1;
+
+            // Treat wins/losses/elo as one atomic snapshot: adopt the incoming
+            // record wholesale only if it reflects more games than what we have,
+            // so an Elo rating never gets separated from the record it belongs to.
+            if (incomingTotal > currentTotal) {
+              globalData.stats[num] = {
+                wins: incoming.wins || 0,
+                losses: incoming.losses || 0,
+                elo: incoming.elo || 1500,
+              };
+            } else if (!current) {
               globalData.stats[num] = { wins: 0, losses: 0, elo: 1500 };
-            }
-            if (stats[num].wins > globalData.stats[num].wins) {
-              globalData.stats[num].wins = stats[num].wins;
-            }
-            if (stats[num].losses > globalData.stats[num].losses) {
-              globalData.stats[num].losses = stats[num].losses;
-            }
-            if (stats[num].elo && stats[num].elo > globalData.stats[num].elo) {
-              globalData.stats[num].elo = stats[num].elo;
             }
           }
           if (headToHead) {

@@ -62,9 +62,16 @@
   display: none !important;
 }
 
+html {
+  height: 100%;
+}
+
 body {
   margin: 0;
   min-width: 320px;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
   background-color: var(--bg-app);
   color: var(--text-primary);
   font-family: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -77,10 +84,11 @@ button, input, select {
   color: inherit;
 }
 
-/* App Shell */
+/* App Shell — fills the viewport exactly; header/footer stay fixed in place
+   and each view manages its own scrolling (if any) instead of the whole page. */
 .app-shell {
   width: min(920px, calc(100% - 32px));
-  min-height: 100vh;
+  height: 100%;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -88,6 +96,7 @@ button, input, select {
 
 /* Header & Navigation */
 .topbar {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -169,7 +178,35 @@ button, input, select {
 /* Views */
 .view {
   flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   padding: 32px 0 48px;
+}
+
+/* Matchup view lays out as a column so the board fills whatever vertical
+   space is left instead of overflowing the viewport. */
+#matchup-view.view {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#matchup-view .intro-row,
+#matchup-view .loading-state {
+  flex-shrink: 0;
+}
+
+/* Rankings view keeps its filters fixed and lets the table scroll internally. */
+#rankings-view.view {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+#rankings-view .intro-row,
+#rankings-view .filter-bar,
+#rankings-view .gen-filter-bar {
+  flex-shrink: 0;
 }
 
 .intro-row {
@@ -266,16 +303,18 @@ h2 {
 
 /* Matchup Board */
 .matchup-board {
+  flex: 1;
+  min-height: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 52px minmax(0, 1fr);
-  align-items: center;
+  align-items: stretch;
   gap: 16px;
 }
 
 .pokemon-card {
   display: flex;
   flex-direction: column;
-  min-height: 410px;
+  min-height: 0;
   padding: 20px;
   border: 2px solid var(--border-color);
   border-radius: var(--radius-lg);
@@ -322,13 +361,15 @@ h2 {
   display: grid;
   place-items: center;
   flex: 1;
-  min-height: 220px;
+  min-height: 0;
   padding: 10px 0;
+  overflow: hidden;
 }
 
 .pokemon-art-wrap img {
   width: min(100%, 260px);
-  height: 220px;
+  height: 100%;
+  max-height: 220px;
   object-fit: contain;
   filter: drop-shadow(0 8px 12px rgba(0,0,0,0.08));
   transition: transform 0.2s ease;
@@ -574,7 +615,8 @@ h2 {
 
 /* Table */
 .table-wrap {
-  max-height: 64vh;
+  flex: 1;
+  min-height: 120px;
   overflow-y: auto;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
@@ -586,7 +628,13 @@ table {
   width: 100%;
   border-collapse: collapse;
   text-align: left;
+  table-layout: fixed;
 }
+
+.col-rank { width: 52px; }
+.col-ovr { width: 64px; }
+.col-record { width: 130px; }
+.col-rate { width: 84px; }
 
 thead {
   position: sticky;
@@ -735,22 +783,66 @@ td:first-child {
 /* Responsive */
 @media (max-width: 720px) {
   .app-shell { width: min(100% - 24px, 540px); }
-  .topbar { flex-wrap: wrap; }
-  .brand { width: 100%; text-align: center; }
-  .tabs { width: 100%; }
-  .tab { flex: 1; justify-content: center; }
-  .matchup-board { grid-template-columns: 1fr; gap: 12px; }
-  .pokemon-card { min-height: 0; padding: 16px; }
-  .pokemon-art-wrap { min-height: 180px; }
-  .pokemon-art-wrap img { height: 180px; }
-  .versus span { width: 38px; height: 38px; font-size: 11px; }
-  .filter-bar { flex-direction: column; align-items: stretch; }
+
+  /* Keep the header to a single row on mobile (tabs scroll horizontally
+     instead of wrapping to a 2nd row) so it doesn't eat vertical space
+     that the content below needs to fit without scrolling the page. */
+  .topbar { flex-wrap: nowrap; padding: 12px 0; gap: 8px; }
+  .brand-wordmark { font-size: 17px; }
+  .tabs {
+    flex: 1;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { flex: 0 0 auto; padding: 7px 10px; font-size: 12px; white-space: nowrap; }
+  .icon-button { width: 34px; height: 34px; flex-shrink: 0; }
+
+  .intro-row { margin-bottom: 14px; }
+  h2 { font-size: 22px; }
+  .view { padding: 16px 0 12px; }
+
+  /* Cards stay side-by-side (not stacked) so the board only ever needs
+     the height of one card, not two. */
+  .matchup-board { grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1fr); gap: 8px; }
+  .pokemon-card { min-height: 0; padding: 12px; }
+  .pokemon-art-wrap { padding: 4px 0; }
+  .pokemon-art-wrap img { max-height: 130px; }
+  .pokemon-card-info { padding-top: 8px; margin-bottom: 6px; }
+  .pokemon-card h3 { font-size: 15px; }
+  .dex-number { font-size: 11px; }
+  .ovr-badge { font-size: 10px; padding: 2px 6px; }
+  .card-stats-pill { font-size: 10px; padding: 5px 8px; margin-bottom: 10px; }
+  .pick-button { padding: 9px 10px; font-size: 13px; }
+  .versus span { width: 26px; height: 26px; font-size: 8px; border-width: 1px; }
+
+  .filter-bar { flex-direction: column; align-items: stretch; gap: 8px; margin-bottom: 10px; }
   .sort-toggle { width: 100%; }
   .sort-btn { flex: 1; text-align: center; }
-  .gen-filter-bar { gap: 8px; }
+  .gen-filter-bar { gap: 8px; margin-bottom: 10px; }
   .gen-toggle-group { flex: 1; }
   .gen-btn { flex: 1; min-width: 0; }
   .disclosure-card { padding: 20px; }
+
+  /* Table: drop the redundant Win Rate column and tighten padding so all
+     columns fit within the viewport width without a horizontal scroll. */
+  .col-rank { width: 40px; }
+  .col-ovr { width: 54px; }
+  .col-record { width: 92px; }
+  .col-rate, td.rate { display: none; }
+  th, td { padding: 8px 4px; font-size: 12px; }
+  th:first-child, td:first-child { padding-left: 10px; }
+  th:last-child, td:last-child { padding-right: 10px; }
+  .rank-name { gap: 8px; }
+  .rank-name img { width: 28px; height: 28px; }
+}
+
+@media (max-width: 380px) {
+  .pokemon-art-wrap img { max-height: 100px; }
+  .pokemon-card h3 { font-size: 13px; }
+  .pick-button span { display: none; }
+  .pick-button::after { content: "Pick"; }
 }
 
 /* ── About Page ─────────────────────────────────────────── */

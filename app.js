@@ -28,30 +28,42 @@ function showToast(message) {
   setTimeout(() => { toast.hidden = true; }, 3000);
 }
 
-// Dynamically compute Elo rating based on win rate and opponent-weighting
+// Read tracked Elo rating, defaulting to the 1500 baseline
 function getEloFromStats(stats) {
-  if (!stats) return 1500;
-  if (stats.elo !== undefined && stats.elo !== 1500) {
-    return stats.elo;
-  }
-  const wins = stats.wins || 0;
-  const losses = stats.losses || 0;
-  const total = wins + losses;
-  if (!total) return 1500;
+  if (!stats || stats.elo === undefined) return 1500;
+  return stats.elo;
+}
 
-  // Win rate ratio with laplace smoothing (+1 win, +1 loss)
-  const winRate = (wins + 1) / (total + 2);
-  // Logarithmic Elo offset: winRate 0.5 -> 0, winRate 0.9 -> +380, winRate 0.1 -> -380
-  const eloOffset = Math.round(400 * Math.log10(winRate / (1 - winRate)));
-  return 1500 + eloOffset;
+// Wilson score lower bound: a record-based confidence score in [0, 1] that never
+// disagrees with the raw win/loss record (more wins & fewer losses always scores
+// at least as high), and doesn't overrate small sample sizes (e.g. a 1-0 record).
+function wilsonScore(wins, losses) {
+  const n = wins + losses;
+  if (n === 0) return 0.5;
+  const z = 1.96; // 95% confidence
+  const z2 = z * z;
+  const phat = wins / n;
+  return (phat + z2 / (2 * n) - z * Math.sqrt((phat * (1 - phat) + z2 / (4 * n)) / n)) / (1 + z2 / n);
 }
 
 // Calculate NBA 2K Style OVR rating (Scale 60 to 99)
+// Primarily driven by the win/loss record (via Wilson score, so it's always
+// consistent with what's displayed), with a small capped nudge from the
+// opponent-strength-weighted Elo rating for extra nuance.
 function calculateOvr(stats) {
   if (!stats) return 75;
+  const wins = stats.wins || 0;
+  const losses = stats.losses || 0;
+  const total = wins + losses;
+  if (!total) return 75;
+
+  const wilson = wilsonScore(wins, losses);
+  const recordOvr = 75 + (wilson - 0.5) * 48; // 0 -> 51, 0.5 -> 75, 1 -> 99
+
   const elo = getEloFromStats(stats);
-  // 1500 Elo -> 75 OVR; +20 Elo = +1 OVR
-  const ovr = Math.round(75 + (elo - 1500) / 20);
+  const eloAdj = Math.max(-5, Math.min(5, Math.round((elo - 1500) / 50)));
+
+  const ovr = Math.round(recordOvr + eloAdj);
   return Math.min(99, Math.max(60, ovr));
 }
 
@@ -136,42 +148,70 @@ function loadSavedLocalStorage() {
   return null;
 }
 
-// Sync global data with server API
-async function syncGlobalApiData() {
+// Fetch with a timeout, since Render's free tier can take 30-50s to wake up
+// from a cold start, which a plain fetch() may otherwise hang on indefinitely
+// (especially over a slow/unstable connection) before the browser gives up.
+async function fetchWithTimeout(url, options, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(`${API_BASE_URL}/api/stats`);
-    if (res.ok) {
-      const data = await res.json();
-      state.hasApiBackend = true;
-      const serverTotal = data.totalMatchups || 0;
-
-      if (serverTotal >= state.globalMatchups) {
-        state.globalMatchups = serverTotal;
-        if (data.stats) {
-          state.globalResults = data.stats;
-        }
-        if (data.headToHead) {
-          state.headToHead = data.headToHead;
-        }
-        saveGlobalState();
-      } else if (state.globalMatchups > 0) {
-        // Auto-restore server data if server restarted/reset
-        await fetch(`${API_BASE_URL}/api/sync`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            totalMatchups: state.globalMatchups,
-            stats: state.globalResults,
-            headToHead: state.headToHead,
-          }),
-        });
-      }
-      renderMatchup();
-      renderRankings();
-    }
-  } catch (e) {
-    state.hasApiBackend = false;
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
   }
+}
+
+// Sync global data with server API. Retries on failure (with backoff) before
+// giving up, so a slow cold-start or a flaky connection doesn't get mistaken
+// for "the global data was reset" when the server actually still has it.
+async function syncGlobalApiData() {
+  const maxAttempts = 3;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const res = await fetchWithTimeout(`${API_BASE_URL}/api/stats`, {}, 12000);
+      if (res.ok) {
+        const data = await res.json();
+        state.hasApiBackend = true;
+        const serverTotal = data.totalMatchups || 0;
+
+        if (serverTotal >= state.globalMatchups) {
+          state.globalMatchups = serverTotal;
+          if (data.stats) {
+            state.globalResults = data.stats;
+          }
+          if (data.headToHead) {
+            state.headToHead = data.headToHead;
+          }
+          saveGlobalState();
+        } else if (state.globalMatchups > 0) {
+          // Auto-restore server data if server restarted/reset
+          await fetchWithTimeout(`${API_BASE_URL}/api/sync`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              totalMatchups: state.globalMatchups,
+              stats: state.globalResults,
+              headToHead: state.headToHead,
+            }),
+          }, 12000);
+        }
+        renderMatchup();
+        renderRankings();
+        return;
+      }
+    } catch (e) {
+      // Fall through to retry below
+    }
+
+    if (attempt < maxAttempts) {
+      await new Promise((resolve) => setTimeout(resolve, attempt * 1500));
+    }
+  }
+
+  // All attempts failed: don't silently present an empty/local-only view as
+  // if the global data were gone — tell the user it's a connectivity issue.
+  state.hasApiBackend = false;
+  showToast("Couldn't reach the global server — showing locally cached results.");
 }
 
 async function sendVoteToApi(winnerNumber, loserNumber) {
@@ -240,8 +280,10 @@ function saveGlobalState() {
 }
 
 function getGlobalStats(number) {
-  const data = state.globalResults[number] || { wins: 0, losses: 0, elo: 1500 };
-  return data;
+  if (!state.globalResults[number]) {
+    state.globalResults[number] = { wins: 0, losses: 0, elo: 1500 };
+  }
+  return state.globalResults[number];
 }
 
 // Local Elo update (opponent-strength weighted)

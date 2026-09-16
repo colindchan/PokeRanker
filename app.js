@@ -10,6 +10,7 @@ const state = {
   headToHead: {},
   globalMatchups: 0,
   current: [],
+  nextPair: [],
   searchQuery: "",
   selectedGens: new Set([1, 2, 3, 4, 5, 6, 7, 8, 9]),
   sortBy: "composite",
@@ -288,6 +289,14 @@ function randomPair() {
   return [state.pokemon[first], state.pokemon[second]];
 }
 
+// Warm the browser's image cache for a Pokemon ahead of time, so by the time
+// it actually appears in a matchup the sprite is already loaded instead of
+// only starting to fetch (and visibly popping in) at that moment.
+function preloadImage(pokemon) {
+  const img = new Image();
+  img.src = getPrimaryImageUrl(pokemon);
+}
+
 // Cards deliberately don't show OVR/record/win rate — showing performance
 // stats at decision time would bias the vote toward what's already popular.
 function fillCard(id, pokemon) {
@@ -334,8 +343,16 @@ function animateCount(el, endValue) {
 }
 
 function renderMatchup() {
-  state.current = randomPair();
+  // Use the pair pre-selected (and preloading) since the last render, so its
+  // images have had the whole time the user spent deciding to load — falls
+  // back to picking fresh only on the very first render of the session.
+  state.current = state.nextPair && state.nextPair.length === 2 ? state.nextPair : randomPair();
   if (state.current.length < 2) return;
+
+  // Line up (and start preloading) the next pair now, ahead of it being
+  // needed.
+  state.nextPair = randomPair();
+  state.nextPair.forEach(preloadImage);
 
   fillCard("card-a", state.current[0]);
   fillCard("card-b", state.current[1]);

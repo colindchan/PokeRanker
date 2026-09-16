@@ -353,11 +353,6 @@ function renderMatchup() {
   fillCard("card-a", state.current[0]);
   fillCard("card-b", state.current[1]);
 
-  const cardA = $("#card-a");
-  const cardB = $("#card-b");
-  if (cardA) cardA.classList.remove("card-picked", "card-not-picked");
-  if (cardB) cardB.classList.remove("card-picked", "card-not-picked");
-
   const loadingEl = $("#loading-state");
   const boardEl = $("#matchup-board");
   if (loadingEl) loadingEl.hidden = true;
@@ -366,21 +361,9 @@ function renderMatchup() {
   animateCount($("#matchup-count"), state.globalMatchups);
 }
 
-// Crossfades to the next matchup: highlight the pick, hold briefly so it
-// reads clearly, fade the whole board out, swap content while invisible
-// (so nothing ever changes mid-motion), then fade back in.
 function choose(winner) {
   const loser = state.current.find((p) => p.number !== winner.number);
   if (!loser) return;
-
-  const boardEl = $("#matchup-board");
-  const winnerCardId = state.current[0].number === winner.number ? "card-a" : "card-b";
-  const loserCardId = winnerCardId === "card-a" ? "card-b" : "card-a";
-  const winnerCardEl = $(`#${winnerCardId}`);
-  const loserCardEl = $(`#${loserCardId}`);
-  if (winnerCardEl) winnerCardEl.classList.add("card-picked");
-  if (loserCardEl) loserCardEl.classList.add("card-not-picked");
-  if (boardEl) boardEl.style.pointerEvents = "none";
 
   // Local state update
   const winnerStats = getGlobalStats(winner.number);
@@ -398,17 +381,8 @@ function choose(winner) {
   // Send vote to backend API
   sendVoteToApi(winner.number, loser.number);
 
-  setTimeout(() => {
-    if (boardEl) boardEl.classList.add("is-swapping");
-    setTimeout(() => {
-      renderMatchup();
-      renderRankings();
-      if (boardEl) {
-        boardEl.classList.remove("is-swapping");
-        boardEl.style.pointerEvents = "";
-      }
-    }, 150);
-  }, 220);
+  renderMatchup();
+  renderRankings();
 }
 
 function getWinRate(stats) {

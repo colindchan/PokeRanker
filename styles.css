@@ -354,17 +354,13 @@ h2 {
   grid-template-columns: minmax(0, 1fr) 52px minmax(0, 1fr);
   align-items: stretch;
   gap: 16px;
+  transition: opacity 0.15s var(--ease);
 }
 
-@keyframes cardPop {
-  from { opacity: 0; transform: scale(0.97) translateY(4px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
-}
-
-@keyframes cardPicked {
-  0% { transform: scale(1); }
-  40% { transform: scale(1.025); }
-  100% { transform: scale(1); }
+/* Crossfade the whole board out before content swaps, then back in — the
+   swap itself happens while invisible, so nothing ever changes mid-motion. */
+.matchup-board.is-swapping {
+  opacity: 0;
 }
 
 .pokemon-card {
@@ -376,18 +372,21 @@ h2 {
   border-radius: var(--radius-lg);
   background-color: var(--bg-surface);
   box-shadow: var(--shadow-sm);
-  transition: transform 0.15s var(--ease), border-color 0.15s var(--ease), box-shadow 0.15s var(--ease);
+  transition: transform 0.15s var(--ease), border-color 0.15s var(--ease), box-shadow 0.15s var(--ease), opacity 0.15s var(--ease);
   outline: none;
   cursor: pointer;
 }
 
-.pokemon-card.card-refresh {
-  animation: cardPop 0.3s var(--ease);
+/* Picked card gets a clear highlight; the other visibly dims — using only
+   border/shadow/opacity (never transform) so this can't fight the card's
+   own hover transform transition. */
+.pokemon-card.card-picked {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px var(--primary-light), var(--shadow-md);
 }
 
-.pokemon-card.card-picked {
-  animation: cardPicked 0.18s var(--ease);
-  border-color: var(--primary-color);
+.pokemon-card.card-not-picked {
+  opacity: 0.5;
 }
 
 .pokemon-card:hover, .pokemon-card:focus-visible {

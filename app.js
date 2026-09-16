@@ -28,30 +28,22 @@ function showToast(message) {
   setTimeout(() => { toast.hidden = true; }, 3000);
 }
 
-// Wilson score lower bound: a record-based confidence score in [0, 1] that never
-// disagrees with the raw win/loss record (more wins & fewer losses always scores
-// at least as high), and doesn't overrate small sample sizes (e.g. a 1-0 record).
-function wilsonScore(wins, losses) {
-  const n = wins + losses;
-  if (n === 0) return 0.5;
-  const z = 1.96; // 95% confidence
-  const z2 = z * z;
-  const phat = wins / n;
-  return (phat + z2 / (2 * n) - z * Math.sqrt((phat * (1 - phat) + z2 / (4 * n)) / n)) / (1 + z2 / n);
+// Read tracked Elo rating, defaulting to the 1500 baseline. Always trusts
+// the persisted value directly (no fallback recompute from wins/losses) —
+// that fallback used to kick in whenever elo happened to equal 1500 exactly,
+// which caused a real Elo to get silently ignored. As long as getGlobalStats
+// always initializes/persists elo and updateLocalElo keeps it current, the
+// tracked value is reliable on its own.
+function getElo(stats) {
+  return stats && stats.elo !== undefined ? stats.elo : 1500;
 }
 
-// Calculate NBA 2K Style OVR rating (Scale 60 to 99), driven entirely by the
-// win/loss record via Wilson score, so it's always consistent with what's
-// displayed and needs no separately-tracked rating that could drift from it.
+// Calculate NBA 2K Style OVR rating (Scale 60 to 99) from opponent-strength
+// weighted Elo. 1500 Elo -> 75 OVR; +20 Elo = +1 OVR.
 function calculateOvr(stats) {
   if (!stats) return 75;
-  const wins = stats.wins || 0;
-  const losses = stats.losses || 0;
-  const total = wins + losses;
-  if (!total) return 75;
-
-  const wilson = wilsonScore(wins, losses);
-  const ovr = Math.round(75 + (wilson - 0.5) * 48); // 0 -> 51, 0.5 -> 75, 1 -> 99
+  const elo = getElo(stats);
+  const ovr = Math.round(75 + (elo - 1500) / 20);
   return Math.min(99, Math.max(60, ovr));
 }
 
@@ -269,9 +261,27 @@ function saveGlobalState() {
 
 function getGlobalStats(number) {
   if (!state.globalResults[number]) {
-    state.globalResults[number] = { wins: 0, losses: 0 };
+    state.globalResults[number] = { wins: 0, losses: 0, elo: 1500 };
   }
   return state.globalResults[number];
+}
+
+// Local Elo update (opponent-strength weighted). Both stats objects here are
+// guaranteed to be the same persisted references getGlobalStats returns, so
+// mutating them in place keeps wins/losses (already updated by choose()) and
+// elo consistent with each other.
+function updateLocalElo(winnerNum, loserNum) {
+  const winnerStats = getGlobalStats(winnerNum);
+  const loserStats = getGlobalStats(loserNum);
+
+  const rW = getElo(winnerStats);
+  const rL = getElo(loserStats);
+
+  const expectedW = 1 / (1 + Math.pow(10, (rL - rW) / 400));
+  const K = 32;
+
+  winnerStats.elo = Math.round(rW + K * (1 - expectedW));
+  loserStats.elo = Math.round(rL - K * (1 - expectedW));
 }
 
 function randomPair() {
@@ -342,16 +352,6 @@ function animateCount(el, endValue) {
   requestAnimationFrame(tick);
 }
 
-// Restart a CSS animation on an element that's already rendered (toggling
-// the class alone wouldn't replay it, since the browser only (re)starts an
-// animation when the property is freshly applied after a reflow).
-function replayAnimation(el, className) {
-  if (!el) return;
-  el.classList.remove(className);
-  void el.offsetWidth;
-  el.classList.add(className);
-}
-
 function renderMatchup() {
   state.current = randomPair();
   if (state.current.length < 2) return;
@@ -361,10 +361,8 @@ function renderMatchup() {
 
   const cardA = $("#card-a");
   const cardB = $("#card-b");
-  if (cardA) cardA.classList.remove("card-picked");
-  if (cardB) cardB.classList.remove("card-picked");
-  replayAnimation(cardA, "card-refresh");
-  replayAnimation(cardB, "card-refresh");
+  if (cardA) cardA.classList.remove("card-picked", "card-not-picked");
+  if (cardB) cardB.classList.remove("card-picked", "card-not-picked");
 
   const loadingEl = $("#loading-state");
   const boardEl = $("#matchup-board");
@@ -374,14 +372,21 @@ function renderMatchup() {
   animateCount($("#matchup-count"), state.globalMatchups);
 }
 
+// Crossfades to the next matchup: highlight the pick, hold briefly so it
+// reads clearly, fade the whole board out, swap content while invisible
+// (so nothing ever changes mid-motion), then fade back in.
 function choose(winner) {
   const loser = state.current.find((p) => p.number !== winner.number);
   if (!loser) return;
 
-  // Brief pulse on the picked card before the next matchup replaces it
+  const boardEl = $("#matchup-board");
   const winnerCardId = state.current[0].number === winner.number ? "card-a" : "card-b";
+  const loserCardId = winnerCardId === "card-a" ? "card-b" : "card-a";
   const winnerCardEl = $(`#${winnerCardId}`);
+  const loserCardEl = $(`#${loserCardId}`);
   if (winnerCardEl) winnerCardEl.classList.add("card-picked");
+  if (loserCardEl) loserCardEl.classList.add("card-not-picked");
+  if (boardEl) boardEl.style.pointerEvents = "none";
 
   // Local state update
   const winnerStats = getGlobalStats(winner.number);
@@ -393,6 +398,9 @@ function choose(winner) {
   const h2hKey = `${winner.number}_vs_${loser.number}`;
   state.headToHead[h2hKey] = (state.headToHead[h2hKey] || 0) + 1;
 
+  // Elo rating update based on opponent strength
+  updateLocalElo(winner.number, loser.number);
+
   state.globalMatchups += 1;
   saveGlobalState();
 
@@ -400,9 +408,16 @@ function choose(winner) {
   sendVoteToApi(winner.number, loser.number);
 
   setTimeout(() => {
-    renderMatchup();
-    renderRankings();
-  }, 160);
+    if (boardEl) boardEl.classList.add("is-swapping");
+    setTimeout(() => {
+      renderMatchup();
+      renderRankings();
+      if (boardEl) {
+        boardEl.classList.remove("is-swapping");
+        boardEl.style.pointerEvents = "";
+      }
+    }, 150);
+  }, 220);
 }
 
 function getWinRate(stats) {

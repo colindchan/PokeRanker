@@ -177,12 +177,13 @@ async function syncGlobalApiData() {
           }
           saveGlobalState();
         } else if (state.globalMatchups > 0) {
-          // Auto-restore server data if server restarted/reset
+          // Auto-restore server data if server restarted/reset. The server
+          // derives its own totalMatchups from the merged wins, so there's
+          // no need to (and no way to) push a total here.
           await fetchWithTimeout(`${API_BASE_URL}/api/sync`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              totalMatchups: state.globalMatchups,
               stats: state.globalResults,
               headToHead: state.headToHead,
             }),

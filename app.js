@@ -1,4 +1,4 @@
-const GLOBAL_STORAGE_KEY = "pokemon-ranker-global-v6";
+const GLOBAL_STORAGE_KEY = "pokemon-ranker-global-v7";
 const THEME_KEY = "pokemon-ranker-theme";
 
 // Optional: Set your hosted backend API URL here if hosted separately (e.g. "https://pokeranker.onrender.com")
@@ -117,26 +117,21 @@ function parseCsvLine(line) {
   return values;
 }
 
-// Check all previous version keys in LocalStorage to preserve historical user data
+// Read the current-version local cache only. Deliberately does NOT fall back
+// to any older versioned key: the server is the source of truth (durable via
+// Redis) and a stale local cache from an old browser session re-injecting
+// itself via the /api/sync "restore" path is exactly what undid a deliberate
+// server-side reset before. Bumping GLOBAL_STORAGE_KEY orphans every old
+// cache immediately, everywhere, without needing to touch each browser.
 function loadSavedLocalStorage() {
-  const keys = [
-    "pokemon-ranker-global-v6",
-    "pokemon-ranker-global-v5",
-    "pokemon-ranker-global-v4",
-    "pokemon-ranker-global-v3",
-    "pokemon-ranker-results-v2",
-    "pokemon-ranker-results-v1"
-  ];
-  for (const k of keys) {
-    const raw = localStorage.getItem(k);
-    if (raw) {
-      try {
-        const parsed = JSON.parse(raw);
-        if (parsed && (parsed.matchups > 0 || (parsed.results && Object.keys(parsed.results).length > 0))) {
-          return parsed;
-        }
-      } catch (e) {}
-    }
+  const raw = localStorage.getItem(GLOBAL_STORAGE_KEY);
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && (parsed.matchups > 0 || (parsed.results && Object.keys(parsed.results).length > 0))) {
+        return parsed;
+      }
+    } catch (e) {}
   }
   return null;
 }
